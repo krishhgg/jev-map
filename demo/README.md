@@ -10,7 +10,11 @@ PYTHONPATH=src:. python demo/build.py        # writes demo/jev-map-graph.html
 python -m http.server -d demo 8765           # or open the file directly
 ```
 
-The page is self-contained apart from loading d3 from jsDelivr.
+The page is self-contained apart from loading d3 from jsDelivr and Overpass from Google Fonts.
+
+It is drawn like an engineering sheet: Jev's proposals are pencilled in, a test that
+ran the function inks the link blue, and one that didn't gets a red strike. Blue and
+red are the only hues, checked for colour-blind separation in both themes.
 
 | Key | Action |
 | --- | --- |
@@ -18,7 +22,8 @@ The page is self-contained apart from loading d3 from jsDelivr.
 | `[` / `]` | Switch repository |
 | Click a node | Candidate tests, Jev scores, execution verdicts, first suggestion |
 | Scroll / drag | Zoom and pan; function labels appear when zoomed in |
-| F / C / R | Fit the graph / hide legend and hints / replay the step |
+| F / C / R | Fit the graph / hide the key and hints / replay the step |
+| D | Switch between paper and dark (or open with `?theme=dark`) |
 
 Steps: Graphify's map → Jev adds test links → running the tests confirms or
 refutes them → the same budget from a keyword ranker → the first suggested test
