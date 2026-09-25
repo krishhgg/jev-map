@@ -59,20 +59,27 @@
   .stack .yes { background: var(--blue); }
   .stack .no { background: repeating-linear-gradient(135deg, var(--red) 0 2px, transparent 2px 5px); border: 1px solid var(--red); }
 
-  #block { right: 28px; bottom: 28px; width: 330px; display: grid; grid-template-columns: 1fr auto; }
-  #block > div { padding: 8px 12px; border-top: 1px solid var(--rule); }
+  #block { right: 28px; bottom: 28px; width: 410px; display: grid; grid-template-columns: 1fr auto; }
+  #block > div { padding: 10px 16px; border-top: 1px solid var(--rule); }
   #block > div:nth-child(-n+2) { border-top: 0; }
-  #block .name { font-weight: 800; font-size: 25px; line-height: 1.1; letter-spacing: -0.01em; padding-top: 12px; }
-  #block .sheetno { border-left: 1px solid var(--rule); font-size: 13px; color: var(--ink2); text-align: right; padding-top: 14px; }
-  #block .sheetno b { color: var(--ink); font-weight: 700; font-size: 18px; display: block; }
+  #block .name { font-weight: 800; font-size: 32px; line-height: 1.05; letter-spacing: -0.015em; padding-top: 16px; }
+  #block .sheetno { border-left: 1px solid var(--rule); font-size: 14px; color: var(--ink2); text-align: right; padding-top: 14px; }
+  #block .sheetno b { color: var(--ink); font-weight: 800; font-size: 24px; display: block; }
   #block .wide { grid-column: 1 / -1; }
-  #block .sub { font-style: italic; color: var(--ink2); padding-top: 0; border-top: 0; }
-  .row { display: flex; align-items: baseline; gap: 14px; font-size: 14px; }
-  .row .lbl { color: var(--ink2); width: 78px; flex: none; font-size: 13px; }
-  .row button { padding: 2px 0; border-bottom: 2px solid transparent; }
-  .row button.on { border-bottom-color: var(--ink); font-weight: 700; }
-  .row button:not(.on) { color: var(--ink2); }
-  #block .foot { font-size: 12.5px; color: var(--ink2); line-height: 1.45; }
+  #block .sub { font-style: italic; font-size: 16px; color: var(--ink2); padding-top: 0; border-top: 0; }
+  .row { display: flex; align-items: center; gap: 6px; font-size: 16px; }
+  .row .lbl { color: var(--ink2); width: 96px; flex: none; font-size: 14px; }
+  /* Each choice is a boxed cell at least 40px tall so it's easy to hit. */
+  .row button { min-width: 40px; height: 40px; padding: 0 12px; border: 1px solid var(--rule); color: var(--ink2);
+    transition: border-color 120ms, background-color 120ms; }
+  #steps button { padding: 0; }
+  .row button:hover { border-color: var(--ink); color: var(--ink); }
+  .row button.on { background: var(--ink); border-color: var(--ink); color: var(--paper); font-weight: 700; }
+  .nav { display: grid; grid-template-columns: 1fr 1.6fr; gap: 6px; }
+  .nav button { height: 44px; border: 1px solid var(--ink); font-size: 16px; font-weight: 700; }
+  .nav button:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
+  .nav button:disabled { border-color: var(--rule); color: var(--rule); cursor: default; }
+  #block .foot { font-size: 13px; color: var(--ink2); line-height: 1.45; }
 
   #key { left: 28px; top: 28px; padding: 10px 14px 10px 12px; font-size: 13px; }
   #key h4 { margin: 0 0 4px; font-size: 13px; font-weight: 700; }
@@ -124,6 +131,7 @@
   <div class="wide sub">Which tests run this function?</div>
   <div class="wide row"><span class="lbl">Repository</span><span id="repos" class="row"></span></div>
   <div class="wide row"><span class="lbl">Sheet</span><span id="steps" class="row"></span></div>
+  <div class="wide nav"><button id="prev">Previous</button><button id="next">Next sheet</button></div>
   <div class="wide foot">A replay of benchmark 05: 144 functions the study hadn't seen, with the method fixed before scoring.
     Space or arrow keys to step. Click a circle to inspect it. D switches to dark.</div>
 </div>
@@ -267,7 +275,7 @@ function load(index) {
 function fit(animate = true) {
   const [x0, x1] = d3.extent(repo.nodes, n => n.x), [y0, y1] = d3.extent(repo.nodes, n => n.y);
   // Frame the graph right of the key and above the bottom boxes; outliers may run under them.
-  const left = Math.min(W * 0.2, 250), right = 50, top = 36, bottom = Math.min(H * 0.24, 210);
+  const left = Math.min(W * 0.2, 250), right = 50, top = 36, bottom = Math.min(H * 0.3, 250);
   const k = Math.min((W - left - right) / (x1 - x0), (H - top - bottom) / (y1 - y0));
   const t = d3.zoomIdentity.translate(left + (W - left - right) / 2, top + (H - top - bottom) / 2)
     .scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
@@ -289,6 +297,8 @@ function setScene(index) {
   document.querySelectorAll("#steps button").forEach((b, i) => {
     b.classList.toggle("on", i === scene); b.setAttribute("aria-pressed", i === scene);
   });
+  document.getElementById("prev").disabled = scene === 0;
+  document.getElementById("next").disabled = scene === SCENES.length - 1;
 }
 
 const reposEl = document.getElementById("repos");
@@ -303,6 +313,8 @@ SCENES.forEach((s, i) => {
   b.textContent = i + 1; b.title = s.title(); b.onclick = () => setScene(i);
   stepsEl.appendChild(b);
 });
+document.getElementById("prev").onclick = () => setScene(scene - 1);
+document.getElementById("next").onclick = () => setScene(scene + 1);
 
 window.addEventListener("keydown", e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;

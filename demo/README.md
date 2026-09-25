@@ -18,7 +18,7 @@ red are the only hues, checked for colour-blind separation in both themes.
 
 | Key | Action |
 | --- | --- |
-| Space, ←/→, 1–6 | Step through the story |
+| Space, ←/→, 1–6, or Next sheet | Step through the story |
 | `[` / `]` | Switch repository |
 | Click a node | Candidate tests, Jev scores, execution verdicts, first suggestion |
 | Scroll / drag | Zoom and pan; function labels appear when zoomed in |
