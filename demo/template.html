@@ -79,6 +79,9 @@
   .nav button { height: 44px; border: 1px solid var(--ink); font-size: 16px; font-weight: 700; }
   .nav button:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
   .nav button:disabled { border-color: var(--rule); color: var(--rule); cursor: default; }
+  #repos { display: grid; gap: 8px; }
+  #repos > .row { flex-wrap: wrap; }
+  #repos .row .row { flex-wrap: wrap; gap: 6px; }
   #block .foot { font-size: 13px; color: var(--ink2); line-height: 1.45; }
 
   #key { left: 28px; top: 28px; padding: 10px 14px 10px 12px; font-size: 13px; }
@@ -129,10 +132,10 @@
   <div class="name">jev-map</div>
   <div class="sheetno">Sheet<b id="sheetno">1 of 6</b></div>
   <div class="wide sub">Which tests run this function?</div>
-  <div class="wide row"><span class="lbl">Repository</span><span id="repos" class="row"></span></div>
+  <div class="wide" id="repos"></div>
   <div class="wide row"><span class="lbl">Sheet</span><span id="steps" class="row"></span></div>
   <div class="wide nav"><button id="prev">Previous</button><button id="next">Next sheet</button></div>
-  <div class="wide foot">A replay of benchmark 05: 144 functions the study hadn't seen, with the method fixed before scoring.
+  <div class="wide foot"><span id="source"></span>
     Space or arrow keys to step. Click a circle to inspect it. D switches to dark.</div>
 </div>
 
@@ -141,7 +144,7 @@
 
 <script>
 const DATA = /*__DATA__*/null;
-const pooled = DATA.pooled;
+const study = () => DATA.studies[repo.study];
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const pct = (a, b) => b ? Math.round(100 * a / b) : 0;
 const short = s => s.split("::").pop();
@@ -156,7 +159,8 @@ const cap = s => s[0].toUpperCase() + s.slice(1);
 const SCENES = [
   { key: "map", title: () => "Start with Graphify's map",
     body: r => `Graphify read ${r.name}'s source and drew ${fmt(r.graphify.nodes)} nodes and ${fmt(r.graphify.edges)} edges ` +
-      `in ${r.graphify.wall_seconds.toFixed(1)} seconds, without calling a model. The ${r.targets.length} open circles are the functions we sampled.`,
+      `in ${r.graphify.wall_seconds.toFixed(1)} seconds, without calling a model. The ${r.targets.length} open circles are the functions we sampled.` +
+      (r.shownNodes < r.totalNodes ? ` Shown here: the ${fmt(r.shownNodes)} nodes nearest them.` : ""),
     figure: () => "" },
   { key: "jev", title: () => "Jev pencils in test links",
     body: r => {
@@ -164,39 +168,43 @@ const SCENES = [
       const note = known === 0 ? "None of them were in Graphify's call graph."
         : `Only ${say(known)} of them ${known === 1 ? "was" : "were"} already in Graphify's call graph.`;
       return `Keyword search offers three candidate tests for each circled function. Jev scores every pair, about ` +
-        `${(pooled.jevSeconds / pooled.jevRequests).toFixed(2)} seconds each, and anything at 0.8 or above gets pencilled in: ` +
+        `${(study().jevSeconds / study().jevRequests).toFixed(2)} seconds each, and anything at 0.8 or above gets pencilled in: ` +
         `${acc.length} of ${r.overlay.length} here. ${note}`;
     },
     figure: () => "" },
   { key: "verify", title: () => "Then we ran the tests",
     body: () => "We ran every test under a call tracer, after Jev had answered. Blue ink means the test called the function. A red strike means it didn't.",
     figure: r => {
-      const acc = r.overlay.filter(l => l.jev), ok = acc.filter(l => l.observed).length, e = pooled.edge.jev;
+      const acc = r.overlay.filter(l => l.jev), ok = acc.filter(l => l.observed).length, e = study().edge.jev;
       return `<div class="num">${ok} <small>of ${acc.length}</small></div>
-        <div class="cap">links confirmed in ${r.name}. Across all three repositories, ${e.observed} of ${e.emitted_eligible}, or ${pct(e.observed, e.emitted_eligible)}%.</div>`;
+        <div class="cap">links confirmed in ${r.name}. Across the ${study().repoCount} repositories in this study, ${e.observed} of ${e.emitted_eligible}, or ${pct(e.observed, e.emitted_eligible)}%.</div>`;
     } },
   { key: "keyword", title: () => "A keyword ranker, same budget",
-    body: () => `Now a plain keyword ranker picks the same number of links, ${pooled.edge.jev.emitted_eligible} across the three repositories. ` +
+    body: () => `Now a plain keyword ranker picks the same number of links, ${study().edge.jev.emitted_eligible} across the ${study().repoCount} repositories. ` +
       "Its picks are inked here and Jev's fade into the background.",
     figure: () => {
-      const j = pooled.edge.jev, k = pooled.edge.lexical_equal_count;
+      const j = study().edge.jev, k = study().edge.lexical_equal_count;
       const bar = (name, e) => `<span class="name">${name}</span>
         <span class="stack"><span class="yes" data-g="${e.observed}"></span><span class="no" data-g="${e.emitted_eligible - e.observed}"></span></span>
         <span class="val">${e.observed} of ${e.emitted_eligible}, ${pct(e.observed, e.emitted_eligible)}%</span>`;
       return `<div class="bars">${bar("Jev", j)}${bar("Keywords", k)}</div>
-        <div class="cap">Confirmed links on 144 functions the study hadn't seen before.</div>`;
+        <div class="cap">Confirmed links on ${study().targets} functions sampled before any result was known.` +
+        (study().edgeGate ? "" : " The study's pre-set test for this comparison isn't met: some Jev requests failed, and the rule allowed none.") +
+        `</div>`;
     } },
-  { key: "first", title: () => "The first test you'd open",
+  { key: "first", title: () => study().hitAfter > study().hitBefore ? "The first test you'd open"
+      : study().hitAfter === study().hitBefore ? "The first suggestion held steady" : "The first suggestion got worse",
     body: r => {
       const pos = r.targets.filter(t => t.positive);
       const gain = pos.filter(t => !t.beforeHit && t.afterHit).length, loss = pos.filter(t => t.beforeHit && !t.afterHit).length;
-      if (!gain && !loss) return `With Jev's links added, the top suggestion didn't get better or worse for any function in ${r.name}. The gains came from the other two repositories.`;
+      if (!gain && !loss) return `With Jev's links added, the top suggestion didn't get better or worse for any function in ${r.name}. Any change came from other repositories in this study.`;
       return `With Jev's links added, the top suggestion changed for ${say(gain + loss)} ${gain + loss === 1 ? "function" : "functions"} in ${r.name}. ` +
         `${cap(say(gain))} now ${gain === 1 ? "points" : "point"} to a test that runs ${gain === 1 ? "it" : "them"}` +
         (loss ? `, and ${say(loss)} got worse.` : ".") + " Blue rings mark the fixes, red rings the losses.";
     },
-    figure: () => `<div class="num">${pooled.hitAfter} <small>of ${pooled.positive}</small></div>
-      <div class="cap">functions whose top suggested test really runs them, across all three repositories. Without Jev it was ${pooled.hitBefore}.</div>` },
+    figure: () => `<div class="num">${study().hitAfter} <small>of ${study().positive}</small></div>
+      <div class="cap">functions whose top suggested test really runs them, across the ${study().repoCount} repositories in this study. Without Jev it was ${study().hitBefore}.` +
+      (study().primaryGate ? "" : " That's short of the improvement the study required in advance.") + `</div>` },
   { key: "limits", title: () => "Where it didn't help",
     body: () => "We gave the same hints to a coding agent that already had Graphify, ripgrep and pytest. It found the right test for 23 of 24 " +
       "functions with Jev, and 23 without. Jev's hints cost about a tenth of a small LLM's, but the agent got there on its own. " +
@@ -266,16 +274,23 @@ function load(index) {
   if (REDUCED) sim.stop();
   fit(false);
   selected = null; renderDetail();
-  document.querySelectorAll("#repos button").forEach((b, i) => {
-    b.classList.toggle("on", i === index); b.setAttribute("aria-pressed", i === index);
+  document.querySelectorAll("#repos button").forEach(b => {
+    const on = +b.dataset.index === index;
+    b.classList.toggle("on", on); b.setAttribute("aria-pressed", on);
   });
+  const st = DATA.studies[source.study];
+  document.getElementById("source").textContent = `A replay of benchmark ${st.number}: ${st.targets} functions across ` +
+    `${st.repoCount} repositories, sampled and frozen before any result was known.`;
   setScene(scene);
 }
 
 function fit(animate = true) {
   const [x0, x1] = d3.extent(repo.nodes, n => n.x), [y0, y1] = d3.extent(repo.nodes, n => n.y);
   // Frame the graph right of the key and above the bottom boxes; outliers may run under them.
-  const left = Math.min(W * 0.2, 250), right = 50, top = 36, bottom = Math.min(H * 0.3, 250);
+  const block = document.getElementById("block");
+  // When the title block fills the right-hand side, frame the graph beside it.
+  const right = block.offsetHeight > H * 0.45 ? block.offsetWidth + 48 : 50;
+  const left = Math.min(W * 0.2, 250), top = 36, bottom = Math.min(H * 0.3, 250);
   const k = Math.min((W - left - right) / (x1 - x0), (H - top - bottom) / (y1 - y0));
   const t = d3.zoomIdentity.translate(left + (W - left - right) / 2, top + (H - top - bottom) / 2)
     .scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
@@ -302,15 +317,25 @@ function setScene(index) {
 }
 
 const reposEl = document.getElementById("repos");
-DATA.repositories.forEach((r, i) => {
-  const b = document.createElement("button");
-  b.textContent = r.name; b.onclick = () => load(i);
-  reposEl.appendChild(b);
-});
+const STUDY_LABELS = { popular: "Popular", original: "First study" };
+for (const key of Object.keys(DATA.studies)) {
+  const row = document.createElement("div");
+  row.className = "row";
+  row.innerHTML = `<span class="lbl">${Object.keys(DATA.studies).length > 1 ? STUDY_LABELS[key] : "Repository"}</span><span class="row"></span>`;
+  DATA.repositories.forEach((r, i) => {
+    if (r.study !== key) return;
+    const b = document.createElement("button");
+    b.textContent = r.name; b.dataset.index = i; b.onclick = () => load(i);
+    row.lastElementChild.appendChild(b);
+  });
+  reposEl.appendChild(row);
+}
+const STEP_NAMES = ["Graphify's map", "Jev pencils in links", "Run the tests", "Keyword ranker, same budget",
+  "The first test you'd open", "Where it didn't help"];
 const stepsEl = document.getElementById("steps");
 SCENES.forEach((s, i) => {
   const b = document.createElement("button");
-  b.textContent = i + 1; b.title = s.title(); b.onclick = () => setScene(i);
+  b.textContent = i + 1; b.title = STEP_NAMES[i]; b.onclick = () => setScene(i);
   stepsEl.appendChild(b);
 });
 document.getElementById("prev").onclick = () => setScene(scene - 1);
