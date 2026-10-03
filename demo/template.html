@@ -39,18 +39,21 @@
   canvas.dragging { cursor: grabbing; }
   #sheet { position: fixed; inset: 12px; border: 1px solid var(--rule); pointer-events: none; }
   .box { position: fixed; background: var(--paper); border: 1px solid var(--rule); }
-  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
-  button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  button, select { font: inherit; color: inherit; }
+  button { background: none; border: 0; padding: 0; cursor: pointer; }
+  button:focus-visible, select:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
   code, .mono { font-family: "Overpass Mono", ui-monospace, monospace; font-size: 0.9em; }
 
-  #story { left: 28px; bottom: 28px; width: min(470px, calc(100vw - 56px)); padding: 20px 22px 18px; }
+  #story { left: 28px; bottom: 28px; width: min(480px, calc(100vw - 56px)); padding: 20px 22px 18px; }
+  #story .kicker { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink2); margin-bottom: 4px; }
   #story h2 { margin: 0 0 8px; font-weight: 800; font-size: 29px; line-height: 1.1; letter-spacing: -0.015em; }
-  #story p { margin: 0; color: var(--ink2); max-width: 46ch; }
+  #story p { margin: 0; color: var(--ink2); max-width: 48ch; }
+  #story p code { color: var(--ink); word-break: break-word; }
   #figure:empty { display: none; }
   #figure { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule); }
   .num { font-weight: 800; font-size: 50px; line-height: 1; letter-spacing: -0.02em; }
   .num small { font-size: 20px; font-weight: 600; letter-spacing: 0; color: var(--ink2); }
-  .cap { color: var(--ink2); font-size: 13.5px; margin-top: 6px; max-width: 48ch; }
+  .cap { color: var(--ink2); font-size: 13.5px; margin-top: 6px; max-width: 50ch; }
   .bars { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 12px; align-items: center; font-size: 14px; }
   .bars .name { font-weight: 600; }
   .bars .val { font-variant-numeric: tabular-nums; color: var(--ink2); }
@@ -58,9 +61,19 @@
   .stack span { display: block; height: 100%; transition: flex-grow 900ms cubic-bezier(.2,.7,.2,1); flex-grow: 0; flex-basis: 0; }
   .stack .yes { background: var(--blue); }
   .stack .no { background: repeating-linear-gradient(135deg, var(--red) 0 2px, transparent 2px 5px); border: 1px solid var(--red); }
+  /* One row per candidate test: name, score bar with the 0.8 cutoff, score, outcome. */
+  .cands { display: grid; grid-template-columns: minmax(0, 1fr) 84px 34px 64px; gap: 7px 10px; align-items: center; font-size: 13.5px; }
+  .cands code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink2); }
+  .cands .meter { position: relative; height: 10px; border: 1px solid var(--rule); }
+  .cands .meter i { position: absolute; inset: 0 auto 0 0; background: var(--graphite); transition: width 700ms cubic-bezier(.2,.7,.2,1); }
+  .cands .meter::after { content: ""; position: absolute; left: 80%; top: -4px; bottom: -4px; border-left: 2px solid var(--ink); }
+  .cands .val { font-variant-numeric: tabular-nums; text-align: right; }
+  .cands .out { color: var(--ink2); }
+  .cands .on code, .cands .on .out { color: var(--ink); font-weight: 700; }
+  .cands .on .meter i { background: var(--ink); }
 
   #block { right: 28px; bottom: 28px; width: 410px; display: grid; grid-template-columns: 1fr auto; }
-  #block > div { padding: 10px 16px; border-top: 1px solid var(--rule); }
+  #block > div, #block > label { padding: 10px 16px; border-top: 1px solid var(--rule); }
   #block > div:nth-child(-n+2) { border-top: 0; }
   #block .name { font-weight: 800; font-size: 32px; line-height: 1.05; letter-spacing: -0.015em; padding-top: 16px; }
   #block .sheetno { border-left: 1px solid var(--rule); font-size: 14px; color: var(--ink2); text-align: right; padding-top: 14px; }
@@ -69,34 +82,36 @@
   #block .sub { font-style: italic; font-size: 16px; color: var(--ink2); padding-top: 0; border-top: 0; }
   .row { display: flex; align-items: center; gap: 6px; font-size: 16px; }
   .row .lbl { color: var(--ink2); width: 96px; flex: none; font-size: 14px; }
-  /* Each choice is a boxed cell at least 40px tall so it's easy to hit. */
-  .row button { min-width: 40px; height: 40px; padding: 0 12px; border: 1px solid var(--rule); color: var(--ink2);
+  select { flex: 1; min-width: 0; height: 40px; padding: 0 10px; font-size: 16px; font-weight: 600;
+    background: var(--paper); border: 1px solid var(--rule); cursor: pointer; }
+  select:hover { border-color: var(--ink); }
+  /* Each step is a boxed cell 40px tall so it's easy to hit. */
+  #steps { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; width: 100%; }
+  #steps button { height: 40px; border: 1px solid var(--rule); color: var(--ink2); font-size: 16px;
     transition: border-color 120ms, background-color 120ms; }
-  #steps button { padding: 0; }
-  .row button:hover { border-color: var(--ink); color: var(--ink); }
-  .row button.on { background: var(--ink); border-color: var(--ink); color: var(--paper); font-weight: 700; }
+  #steps button:hover { border-color: var(--ink); color: var(--ink); }
+  #steps button.on { background: var(--ink); border-color: var(--ink); color: var(--paper); font-weight: 700; }
   .nav { display: grid; grid-template-columns: 1fr 1.6fr; gap: 6px; }
   .nav button { height: 44px; border: 1px solid var(--ink); font-size: 16px; font-weight: 700; }
   .nav button:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
   .nav button:disabled { border-color: var(--rule); color: var(--rule); cursor: default; }
-  #repos { display: grid; gap: 8px; }
-  #repos > .row { flex-wrap: wrap; }
-  #repos .row .row { flex-wrap: wrap; gap: 6px; }
   #block .foot { font-size: 13px; color: var(--ink2); line-height: 1.45; }
 
   #key { left: 28px; top: 28px; padding: 10px 14px 10px 12px; font-size: 13px; }
   #key h4 { margin: 0 0 4px; font-size: 13px; font-weight: 700; }
   #key div { display: flex; align-items: center; gap: 9px; margin: 3px 0; color: var(--ink2); }
+  #key div[hidden] { display: none; }
   #key svg { width: 28px; height: 12px; flex: none; overflow: visible; }
 
-  #detail { right: 28px; top: 28px; width: 360px; max-height: calc(100vh - 300px); overflow: auto; padding: 14px 16px; display: none; }
+  #detail { right: 28px; top: 28px; width: 360px; overflow: auto; padding: 14px 16px; display: none; }
   #detail h3 { margin: 0 32px 2px 0; font: 600 16px/1.3 "Overpass Mono", monospace; word-break: break-word; }
   #detail .file { color: var(--ink2); font-size: 12.5px; word-break: break-all; }
   #detail h4 { margin: 14px 0 4px; font-size: 13px; font-weight: 700; }
   #detail table { width: 100%; border-collapse: collapse; font-size: 13px; }
   #detail td { padding: 4px 0; border-top: 1px solid var(--rule); vertical-align: top; }
-  #detail td.n { text-align: right; font-variant-numeric: tabular-nums; width: 44px; }
-  #detail td.v { text-align: right; width: 52px; font-weight: 600; }
+  #detail td code { word-break: break-word; }
+  #detail td.n { text-align: right; font-variant-numeric: tabular-nums; width: 64px; }
+  #detail td.v { text-align: right; width: 60px; font-weight: 600; }
   #detail .yes { color: var(--blue); } #detail .no { color: var(--red); } #detail .none { color: var(--ink2); }
   #detail .hi { font-weight: 700; }
   #detail .note { color: var(--ink2); font-size: 12.5px; margin-top: 6px; }
@@ -112,17 +127,23 @@
 <canvas id="stage" aria-label="Graphify code graph with Jev's test links"></canvas>
 <div id="sheet"></div>
 
+<!-- Each step shows only the key entries for what's on screen. -->
 <div id="key" class="box" aria-label="Key">
   <h4>Key</h4>
-  <div><svg viewBox="0 0 28 12"><circle cx="14" cy="6" r="4.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/></svg>Function we sampled</div>
-  <div><svg viewBox="0 0 28 12"><circle cx="14" cy="6" r="3" fill="var(--graphite)"/></svg>Other function or module</div>
-  <div><svg viewBox="0 0 28 12"><rect x="11" y="3" width="6" height="6" fill="var(--ink2)"/></svg>Test</div>
-  <div><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--pencil)" stroke-width="1.5" stroke-dasharray="4 3"/></svg>Link Jev proposed</div>
-  <div><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--blue)" stroke-width="2.2"/></svg>Test ran the function</div>
-  <div><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--red)" stroke-width="1.8" stroke-dasharray="3 3"/><path d="M11 2 l6 8 M17 2 l-6 8" stroke="var(--red)" stroke-width="1.8"/></svg>Test didn't</div>
+  <div data-k="fn"><svg viewBox="0 0 28 12"><circle cx="14" cy="6" r="4.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/></svg>Function we picked</div>
+  <div data-k="code"><svg viewBox="0 0 28 12"><circle cx="14" cy="6" r="3" fill="var(--graphite)"/></svg>Other code</div>
+  <div data-k="test"><svg viewBox="0 0 28 12"><rect x="11" y="3" width="6" height="6" fill="var(--ink2)"/></svg>Test</div>
+  <div data-k="edge"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--graphite)" stroke-width="1"/></svg>Call or import Graphify found</div>
+  <div data-k="added"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--pencil)" stroke-width="2" stroke-dasharray="5 3"/></svg>Jev scored 0.8 or higher, link added</div>
+  <div data-k="rejected"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--graphite)" stroke-width="1.4" stroke-dasharray="1.5 3"/></svg>Below 0.8, not added</div>
+  <div data-k="ran"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--blue)" stroke-width="2.2"/></svg>The test ran the function</div>
+  <div data-k="didnt"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--red)" stroke-width="1.8" stroke-dasharray="3 3"/><path d="M11 2 l6 8 M17 2 l-6 8" stroke="var(--red)" stroke-width="1.8"/></svg>The test didn't run it</div>
+  <div data-k="better"><svg viewBox="0 0 28 12"><circle cx="14" cy="6" r="5.5" fill="none" stroke="var(--blue)" stroke-width="2"/></svg>First suggestion got better</div>
+  <div data-k="worse"><svg viewBox="0 0 28 12"><circle cx="14" cy="6" r="5.5" fill="none" stroke="var(--red)" stroke-width="2"/></svg>First suggestion got worse</div>
 </div>
 
 <section id="story" class="box" aria-live="polite">
+  <div class="kicker" id="kicker"></div>
   <h2 id="title"></h2>
   <p id="body"></p>
   <div id="figure"></div>
@@ -130,13 +151,13 @@
 
 <div id="block" class="box">
   <div class="name">jev-map</div>
-  <div class="sheetno">Sheet<b id="sheetno">1 of 6</b></div>
+  <div class="sheetno">Step<b id="sheetno">1 of 8</b></div>
   <div class="wide sub">Which tests run this function?</div>
-  <div class="wide" id="repos"></div>
-  <div class="wide row"><span class="lbl">Sheet</span><span id="steps" class="row"></span></div>
-  <div class="wide nav"><button id="prev">Previous</button><button id="next">Next sheet</button></div>
+  <label class="wide row"><span class="lbl">Repository</span><select id="repo"></select></label>
+  <div class="wide"><div id="steps"></div></div>
+  <div class="wide nav"><button id="prev">Back</button><button id="next">Next</button></div>
   <div class="wide foot"><span id="source"></span>
-    Space or arrow keys to step. Click a circle to inspect it. D switches to dark.</div>
+    Arrow keys step through. Click any circle for details. D switches to dark.</div>
 </div>
 
 <aside id="detail" class="box"></aside>
@@ -154,63 +175,118 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const words = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 const say = n => n <= 10 ? words[n] : String(n);
 const cap = s => s[0].toUpperCase() + s.slice(1);
+const escape = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const code = s => `<code>${escape(s)}</code>`;
+const THRESHOLD = 0.8;
 
-// ---------- the six sheets ----------
+// ---------- the eight steps ----------
+// Each step says what is on screen in plain words. `legend` lists the key rows it needs.
+const place = r => `${r.name}, study ${DATA.studies[r.study].number}`;
 const SCENES = [
-  { key: "map", title: () => "Start with Graphify's map",
-    body: r => `Graphify read ${r.name}'s source and drew ${fmt(r.graphify.nodes)} nodes and ${fmt(r.graphify.edges)} edges ` +
-      `in ${r.graphify.wall_seconds.toFixed(1)} seconds, without calling a model. The ${r.targets.length} open circles are the functions we sampled.` +
-      (r.shownNodes < r.totalNodes ? ` Shown here: the ${fmt(r.shownNodes)} nodes nearest them.` : ""),
+  { key: "intro", legend: ["fn", "code", "test", "edge"], kicker: () => "A walkthrough of jev-map",
+    title: () => "Which tests run this function?",
+    body: () => "Before you change a function, you want to run the tests that exercise it. Code graphs often miss " +
+      "those links, because tests tend to reach code indirectly, through fixtures, test clients and frameworks. " +
+      "jev-map asks Jev, TypeSafe's system 1 model, one quick question per candidate test. Does this test run this " +
+      "function? Then we checked every answer by running the tests.",
+    figure: () => `<div class="cap">Eight short steps. Press Next or the right arrow key.</div>` },
+  { key: "map", legend: ["fn", "code", "test", "edge"], kicker: place,
+    title: () => "Graphify maps the code",
+    body: r => `Graphify, an open-source code mapper, read ${r.name}'s source and drew this graph in ` +
+      `${r.graphify.wall_seconds.toFixed(1)} seconds without calling a model. Dots are functions, classes and files, ` +
+      `squares are tests, and lines are the calls and imports it found. The ${r.targets.length} open circles are ` +
+      `functions we picked with a fixed random seed before seeing any results.` +
+      (r.shownNodes < r.totalNodes ? ` This view shows the ${fmt(r.shownNodes)} nodes nearest them, out of ${fmt(r.totalNodes)}.` : ""),
     figure: () => "" },
-  { key: "jev", title: () => "Jev pencils in test links",
+  { key: "example", legend: ["fn", "test", "added", "rejected"], kicker: place,
+    title: () => "Jev checks one function",
+    body: r => {
+      const ex = r.example;
+      return `Take ${code(short(ex.symbol))}. Keyword search found ${say(ex.candidates.length)} tests that might run it. ` +
+        `Jev reads the function and each test, and gives each pair a score. All ${say(ex.candidates.length)} answers come back ` +
+        `in one request, about ${(study().jevSeconds / study().jevRequests).toFixed(2)} seconds on average. ` +
+        `A score of ${THRESHOLD} or higher puts the link on the map.`;
+    },
+    figure: r => {
+      const rows = r.example.candidates.map(c => `<div class="cand${c.score >= THRESHOLD ? " on" : ""}" style="display:contents">
+          <code title="${escape(c.test)}">${escape(short(c.test))}</code>
+          <span class="meter"><i style="width:0" data-w="${Math.round(c.score * 100)}%"></i></span>
+          <span class="val">${c.score.toFixed(2)}</span>
+          <span class="out">${c.score >= THRESHOLD ? "added" : "not added"}</span></div>`).join("");
+      return `<div class="cands">${rows}</div>
+        <div class="cap">The tick on each bar marks the ${THRESHOLD} cutoff. Jev hasn't seen any test results.</div>`;
+    } },
+  { key: "jev", legend: ["fn", "test", "added"], kicker: place,
+    title: () => "Jev adds links across the repo",
     body: r => {
       const acc = r.overlay.filter(l => l.jev), known = acc.filter(l => l.graphify).length;
-      const note = known === 0 ? "None of them were in Graphify's call graph."
-        : `Only ${say(known)} of them ${known === 1 ? "was" : "were"} already in Graphify's call graph.`;
-      return `Keyword search offers three candidate tests for each circled function. Jev scores every pair, about ` +
-        `${(study().jevSeconds / study().jevRequests).toFixed(2)} seconds each, and anything at 0.8 or above gets pencilled in: ` +
-        `${acc.length} of ${r.overlay.length} here. ${note}`;
+      const note = known === 0 ? "Graphify's graph had none of them."
+        : `Graphify's graph had only ${say(known)} of them.`;
+      return `Jev ran the same check on all ${r.targets.length} circled functions. Out of ${r.overlay.length} candidate ` +
+        `links, it added ${acc.length}. ${note}`;
     },
-    figure: () => "" },
-  { key: "verify", title: () => "Then we ran the tests",
-    body: () => "We ran every test under a call tracer, after Jev had answered. Blue ink means the test called the function. A red strike means it didn't.",
+    figure: r => `<div class="num">${r.overlay.filter(l => l.jev).length} <small>links added in ${r.name}</small></div>` },
+  { key: "verify", legend: ["fn", "test", "ran", "didnt"], kicker: place,
+    title: () => "Then we ran the tests",
+    body: r => {
+      const missed = r.overlay.filter(l => l.observed && !l.jev).length;
+      return "Afterwards we ran every test under a tracer that records which functions it calls. Blue means the test " +
+        "called the function. Red means it didn't." +
+        (missed ? ` Jev also left out ${missed} other candidate ${missed === 1 ? "link" : "links"} that the tests did run, ` +
+          "so a link missing from the map doesn't mean a test is unrelated." : "");
+    },
     figure: r => {
       const acc = r.overlay.filter(l => l.jev), ok = acc.filter(l => l.observed).length, e = study().edge.jev;
-      return `<div class="num">${ok} <small>of ${acc.length}</small></div>
-        <div class="cap">links confirmed in ${r.name}. Across the ${study().repoCount} repositories in this study, ${e.observed} of ${e.emitted_eligible}, or ${pct(e.observed, e.emitted_eligible)}%.</div>`;
+      return `<div class="num">${ok} <small>of ${acc.length} were real</small></div>
+        <div class="cap">Jev's links in ${r.name} that a test really ran. Across all ${study().repoCount} repos in this study, ` +
+        `${e.observed} of ${e.emitted_eligible}, or ${pct(e.observed, e.emitted_eligible)}%.</div>`;
     } },
-  { key: "keyword", title: () => "A keyword ranker, same budget",
-    body: () => `Now a plain keyword ranker picks the same number of links, ${study().edge.jev.emitted_eligible} across the ${study().repoCount} repositories. ` +
-      "Its picks are inked here and Jev's fade into the background.",
+  { key: "keyword", legend: ["fn", "test", "ran", "didnt"], kicker: place,
+    title: () => "Could keyword search do this alone?",
+    body: r => {
+      const n = r.overlay.filter(l => l.keyword).length;
+      const here = n === 0 ? `None of them are in ${r.name}.`
+        : `${cap(say(n))} of them ${n === 1 ? "is" : "are"} in ${r.name}, drawn here, with Jev's links faded behind.`;
+      return `Keyword search picked the candidates, so maybe Jev just repeats it. To check, we took the ` +
+        `${study().edge.jev.emitted_eligible} links keyword search scored highest across the ${study().repoCount} repos, ` +
+        `the same number Jev added. ${here}`;
+    },
     figure: () => {
       const j = study().edge.jev, k = study().edge.lexical_equal_count;
       const bar = (name, e) => `<span class="name">${name}</span>
         <span class="stack"><span class="yes" data-g="${e.observed}"></span><span class="no" data-g="${e.emitted_eligible - e.observed}"></span></span>
         <span class="val">${e.observed} of ${e.emitted_eligible}, ${pct(e.observed, e.emitted_eligible)}%</span>`;
       return `<div class="bars">${bar("Jev", j)}${bar("Keywords", k)}</div>
-        <div class="cap">Confirmed links on ${study().targets} functions sampled before any result was known.` +
-        (study().edgeGate ? "" : " The study's pre-set test for this comparison isn't met: some Jev requests failed, and the rule allowed none.") +
+        <div class="cap">Links a test really ran, out of the ${j.emitted_eligible} each method picked.` +
+        (study().edgeGate ? "" : ` By the rules we set before this study, this comparison doesn't count as a pass, because ` +
+          `${study().jevErrors} of Jev's ${study().jevRequests} requests failed and the rules allowed no failures.`) +
         `</div>`;
     } },
-  { key: "first", title: () => study().hitAfter > study().hitBefore ? "The first test you'd open"
-      : study().hitAfter === study().hitBefore ? "The first suggestion held steady" : "The first suggestion got worse",
+  { key: "first", legend: ["fn", "ran", "didnt", "better", "worse"], kicker: place,
+    title: () => "Does the first suggestion run it?",
     body: r => {
+      const intro = "For each function, jev-map ranks the tests and suggests one to open first. Each line goes from a function to that first test. ";
       const pos = r.targets.filter(t => t.positive);
       const gain = pos.filter(t => !t.beforeHit && t.afterHit).length, loss = pos.filter(t => t.beforeHit && !t.afterHit).length;
-      if (!gain && !loss) return `With Jev's links added, the top suggestion didn't get better or worse for any function in ${r.name}. Any change came from other repositories in this study.`;
-      return `With Jev's links added, the top suggestion changed for ${say(gain + loss)} ${gain + loss === 1 ? "function" : "functions"} in ${r.name}. ` +
-        `${cap(say(gain))} now ${gain === 1 ? "points" : "point"} to a test that runs ${gain === 1 ? "it" : "them"}` +
-        (loss ? `, and ${say(loss)} got worse.` : ".") + " Blue rings mark the fixes, red rings the losses.";
+      if (!gain && !loss) return intro + `Adding Jev's links didn't change whether it was right for any function in ${r.name}. ` +
+        "Any change came from other repos in this study.";
+      const fns = n => `${say(n)} ${n === 1 ? "function" : "functions"}`;
+      const better = gain ? `fixed the first suggestion for ${fns(gain)} in ${r.name}, ringed in blue` : "";
+      const worse = loss ? `made ${gain ? "it" : "the first suggestion"} worse for ${fns(loss)}${gain ? "" : ` in ${r.name}`}, ringed in red` : "";
+      return intro + `Adding Jev's links ${[better, worse].filter(Boolean).join(", and ")}.`;
     },
-    figure: () => `<div class="num">${study().hitAfter} <small>of ${study().positive}</small></div>
-      <div class="cap">functions whose top suggested test really runs them, across the ${study().repoCount} repositories in this study. Without Jev it was ${study().hitBefore}.` +
-      (study().primaryGate ? "" : " That's short of the improvement the study required in advance.") + `</div>` },
-  { key: "limits", title: () => "Where it didn't help",
-    body: () => "We gave the same hints to a coding agent that already had Graphify, ripgrep and pytest. It found the right test for 23 of 24 " +
-      "functions with Jev, and 23 without. Jev's hints cost about a tenth of a small LLM's, but the agent got there on its own. " +
-      "So far the gain is in the map. We haven't seen it change what a strong agent does.",
-    figure: () => `<div class="num">23 <small>of 24, both ways</small></div>
-      <div class="cap">Agent test navigation on three new repositories, one run per task.</div>` },
+    figure: () => `<div class="num">${study().hitAfter} <small>of ${study().positive} with Jev</small></div>
+      <div class="cap">Functions whose first suggested test really runs them, across the ${study().repoCount} repos. ` +
+      `Without Jev, ${study().hitBefore}. We left out functions that no test runs.` +
+      (study().primaryGate ? "" : " The gain is smaller than the one we said in advance would count as a win.") + `</div>` },
+  { key: "limits", legend: ["fn", "code", "test"], kicker: () => "A separate study",
+    title: () => "Where it didn't help",
+    body: () => "Next we gave Jev's hints to a coding agent that already had Graphify, ripgrep and pytest, and asked it to " +
+      "find a test that runs each of 24 functions in three other repos. It got 23 right with Jev's hints and 23 without. " +
+      "A small LLM's hints got 24, and they cost about ten times as much to make. Jev improved the map, " +
+      "but the agent found the answers without it.",
+    figure: () => `<div class="num">23 <small>of 24, with or without Jev</small></div>
+      <div class="cap">Study 06: cachetools, Tenacity and attrs, one agent run per task.</div>` },
 ];
 
 // ---------- state ----------
@@ -218,7 +294,7 @@ const canvas = document.getElementById("stage");
 const ctx = canvas.getContext("2d");
 let W = 0, H = 0, DPR = 1, C = {};
 let repo = null, sim = null, transform = d3.zoomIdentity;
-let scene = 0, sceneStart = performance.now();
+let scene = 0, sceneStart = performance.now(), framing = null;
 let hover = null, selected = null;
 
 function readTheme() {
@@ -238,6 +314,14 @@ function resize() {
 }
 window.addEventListener("resize", resize);
 resize();
+
+// The worked example is the first sampled function, in study order, where Jev
+// both added and rejected a candidate. Its outcome is shown as recorded.
+function pickExample(targets) {
+  const usable = t => t.candidates.length >= 2;
+  return targets.find(t => usable(t) && t.candidates.some(c => c.score >= THRESHOLD) && t.candidates.some(c => c.score < THRESHOLD))
+    || targets.find(usable) || targets[0];
+}
 
 function load(index) {
   const source = DATA.repositories[index];
@@ -260,7 +344,10 @@ function load(index) {
   const accepted = overlay.filter(l => l.jev).sort((x, y) => y.score - x.score);
   accepted.forEach((l, k) => { l.order = k / Math.max(1, accepted.length - 1); });
   overlay.filter(l => l.keyword).forEach((l, k, all) => { l.korder = k / Math.max(1, all.length - 1); });
-  repo = { ...source, nodes, links, overlay, index };
+  const ex = pickExample(source.targets);
+  const example = { ...ex, candidates: [...ex.candidates].sort((x, y) => y.score - x.score) };
+  example.links = example.candidates.map((c, k) => ({ a: nodes[ex.node], b: nodes[c.node], score: c.score, test: c.test, k }));
+  repo = { ...source, nodes, links, overlay, index, example };
 
   sim = d3.forceSimulation(nodes)
     .force("link", d3.forceLink(links).distance(l => l.relation === "contains" || l.relation === "method" ? 14 : 38)
@@ -269,86 +356,98 @@ function load(index) {
     .force("x", d3.forceX().strength(0.035))
     .force("y", d3.forceY().strength(0.045))
     .force("collide", d3.forceCollide(n => n.r + 1.5))
-    .alphaDecay(0.018);
+    .alphaDecay(0.018)
+    // The close-up is framed while the layout is still settling, so reframe once it stops.
+    .on("end", () => { if (framing === "example") frameNodes(exampleNodes(), true); });
   for (let k = 0; k < (REDUCED ? 300 : 60); k++) sim.tick();
   if (REDUCED) sim.stop();
-  fit(false);
   selected = null; renderDetail();
-  document.querySelectorAll("#repos button").forEach(b => {
-    const on = +b.dataset.index === index;
-    b.classList.toggle("on", on); b.setAttribute("aria-pressed", on);
-  });
+  document.getElementById("repo").value = String(index);
   const st = DATA.studies[source.study];
-  document.getElementById("source").textContent = `A replay of benchmark ${st.number}: ${st.targets} functions across ` +
-    `${st.repoCount} repositories, sampled and frozen before any result was known.`;
-  setScene(scene);
+  document.getElementById("source").textContent = `Recorded results from study ${st.number}, which covers ${st.targets} ` +
+    `functions in ${st.repoCount} repos. Nothing re-runs in your browser.`;
+  framing = null;
+  setScene(scene, false);
 }
 
-function fit(animate = true) {
-  const [x0, x1] = d3.extent(repo.nodes, n => n.x), [y0, y1] = d3.extent(repo.nodes, n => n.y);
-  // Frame the graph right of the key and above the bottom boxes; outliers may run under them.
-  const block = document.getElementById("block");
+const exampleNodes = () => [repo.nodes[repo.example.node], ...repo.example.links.map(l => l.b)];
+
+// Fit the given nodes into the space between the key, the story box and the control block.
+function frameNodes(nodes, animate) {
+  const [x0, x1] = d3.extent(nodes, n => n.x), [y0, y1] = d3.extent(nodes, n => n.y);
+  const block = document.getElementById("block"), story = document.getElementById("story");
+  const close = nodes.length < repo.nodes.length;
   // When the title block fills the right-hand side, frame the graph beside it.
-  const right = block.offsetHeight > H * 0.45 ? block.offsetWidth + 48 : 50;
-  const left = Math.min(W * 0.2, 250), top = 36, bottom = Math.min(H * 0.3, 250);
-  const k = Math.min((W - left - right) / (x1 - x0), (H - top - bottom) / (y1 - y0));
+  const right = block.offsetHeight > H * 0.45 ? block.offsetWidth + 48 : close ? block.offsetWidth + 60 : 50;
+  const left = close ? Math.min(W * 0.25, 300) : Math.min(W * 0.2, 250);
+  const top = close ? 60 : 36, bottom = close ? story.offsetHeight + 70 : Math.min(H * 0.3, 250);
+  const pad = close ? 40 : 0;
+  let k = Math.min((W - left - right - 2 * pad) / Math.max(1, x1 - x0), (H - top - bottom - 2 * pad) / Math.max(1, y1 - y0));
+  if (close) k = Math.min(k, 2.4);
   const t = d3.zoomIdentity.translate(left + (W - left - right) / 2, top + (H - top - bottom) / 2)
     .scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
   d3.select(canvas).transition().duration(animate && !REDUCED ? 900 : 0).call(zoom.transform, t);
 }
+const fit = (animate = true) => frameNodes(repo.nodes, animate);
 
 // ---------- ui ----------
-function setScene(index) {
+function setScene(index, animate = true) {
   scene = Math.max(0, Math.min(SCENES.length - 1, index));
   sceneStart = performance.now();
   const s = SCENES[scene];
+  document.getElementById("kicker").textContent = s.kicker(repo);
   document.getElementById("title").textContent = s.title(repo);
-  document.getElementById("body").textContent = s.body(repo);
+  document.getElementById("body").innerHTML = s.body(repo);
   const figure = document.getElementById("figure");
   figure.innerHTML = s.figure(repo);
   void figure.offsetWidth; // commit the empty bars so the growth transitions
   figure.querySelectorAll("[data-g]").forEach(el => { el.style.flexGrow = el.dataset.g; });
+  figure.querySelectorAll("[data-w]").forEach(el => { el.style.width = el.dataset.w; });
+  document.querySelectorAll("#key [data-k]").forEach(el => { el.hidden = !s.legend.includes(el.dataset.k); });
   document.getElementById("sheetno").textContent = `${scene + 1} of ${SCENES.length}`;
   document.querySelectorAll("#steps button").forEach((b, i) => {
     b.classList.toggle("on", i === scene); b.setAttribute("aria-pressed", i === scene);
   });
   document.getElementById("prev").disabled = scene === 0;
   document.getElementById("next").disabled = scene === SCENES.length - 1;
+  const want = s.key === "example" ? "example" : "all";
+  if (want !== framing) {
+    framing = want;
+    if (want === "example") frameNodes(exampleNodes(), animate); else fit(animate);
+  }
 }
 
-const reposEl = document.getElementById("repos");
-const STUDY_LABELS = { popular: "Popular", original: "First study" };
+const picker = document.getElementById("repo");
+const GROUPS = { popular: "Popular repos (study 07)", original: "Smaller repos (study 05)" };
 for (const key of Object.keys(DATA.studies)) {
-  const row = document.createElement("div");
-  row.className = "row";
-  row.innerHTML = `<span class="lbl">${Object.keys(DATA.studies).length > 1 ? STUDY_LABELS[key] : "Repository"}</span><span class="row"></span>`;
+  const group = document.createElement("optgroup");
+  group.label = GROUPS[key];
   DATA.repositories.forEach((r, i) => {
     if (r.study !== key) return;
-    const b = document.createElement("button");
-    b.textContent = r.name; b.dataset.index = i; b.onclick = () => load(i);
-    row.lastElementChild.appendChild(b);
+    group.appendChild(new Option(r.name, String(i)));
   });
-  reposEl.appendChild(row);
+  picker.appendChild(group);
 }
-const STEP_NAMES = ["Graphify's map", "Jev pencils in links", "Run the tests", "Keyword ranker, same budget",
-  "The first test you'd open", "Where it didn't help"];
+picker.onchange = () => load(+picker.value);
+const STEP_NAMES = ["What this is", "Graphify's map", "Jev checks one function", "Jev's links", "Run the tests",
+  "Keyword search, same number", "The first suggestion", "Where it didn't help"];
 const stepsEl = document.getElementById("steps");
 SCENES.forEach((s, i) => {
   const b = document.createElement("button");
-  b.textContent = i + 1; b.title = STEP_NAMES[i]; b.onclick = () => setScene(i);
+  b.textContent = i + 1; b.title = STEP_NAMES[i]; b.setAttribute("aria-label", STEP_NAMES[i]); b.onclick = () => setScene(i);
   stepsEl.appendChild(b);
 });
 document.getElementById("prev").onclick = () => setScene(scene - 1);
 document.getElementById("next").onclick = () => setScene(scene + 1);
 
 window.addEventListener("keydown", e => {
-  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.metaKey || e.ctrlKey || e.altKey || e.target === picker) return;
   const k = e.key.toLowerCase();
   if (e.key === " " || e.key === "ArrowRight") { e.preventDefault(); setScene(scene + 1); }
   else if (e.key === "ArrowLeft") setScene(scene - 1);
-  else if (/^[1-6]$/.test(e.key)) setScene(+e.key - 1);
+  else if (/^[1-8]$/.test(e.key)) setScene(+e.key - 1);
   else if (k === "r") setScene(scene);
-  else if (k === "f") fit();
+  else if (k === "f") { framing = null; setScene(scene); }
   else if (k === "c") document.body.classList.toggle("clean");
   else if (k === "d") setTheme(document.documentElement.dataset.theme === "dark" ? "paper" : "dark");
   else if (e.key === "[") load((repo.index + DATA.repositories.length - 1) % DATA.repositories.length);
@@ -395,35 +494,36 @@ canvas.addEventListener("mousemove", e => {
 canvas.addEventListener("mouseleave", () => { hover = null; tip.style.display = "none"; });
 canvas.addEventListener("click", e => { selected = nodeAt(e.clientX, e.clientY); renderDetail(); });
 
-function escape(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
-const verdict = v => v === null || v === undefined ? `<span class="none">n/a</span>`
-  : v ? `<span class="yes">ran</span>` : `<span class="no">didn't</span>`;
+const verdict = v => v === null || v === undefined ? `<span class="none" title="This test failed, was skipped, or wasn't collected, so we can't tell">n/a</span>`
+  : v ? `<span class="yes">yes</span>` : `<span class="no">no</span>`;
 
 function renderDetail() {
   const el = document.getElementById("detail");
   if (!selected) { el.style.display = "none"; return; }
   el.style.display = "block";
+  // Stop above the control block so the two never overlap.
+  el.style.maxHeight = `${Math.max(160, document.getElementById("block").getBoundingClientRect().top - 44)}px`;
   const n = selected, t = n.target;
   let html = `<button id="close" aria-label="Close" onclick="selected=null;renderDetail()">×</button>
     <h3>${escape(t ? short(t.symbol) : n.label)}</h3><div class="file">${escape(n.file)}${n.unmapped ? ", not in Graphify's graph" : ""}</div>`;
   if (t) {
     const mine = repo.overlay.filter(l => l.f === n.i);
-    html += `<h4>Candidate tests</h4><table><tr><td class="note">test</td><td class="n note">Jev</td><td class="v note">result</td></tr>`;
+    html += `<h4>Tests Jev was asked about</h4><table><tr><td class="note">test</td><td class="n note">Jev score</td><td class="v note">ran it?</td></tr>`;
     for (const c of t.candidates) {
       const link = mine.find(l => l.t === c.node);
-      html += `<tr><td><code class="${c.score >= 0.8 ? "hi" : ""}">${escape(short(c.test))}</code></td>
+      html += `<tr><td><code class="${c.score >= THRESHOLD ? "hi" : ""}">${escape(short(c.test))}</code></td>
         <td class="n">${c.score.toFixed(2)}</td><td class="v">${verdict(link ? link.observed : null)}</td></tr>`;
     }
-    html += `</table><div class="note">Bold tests scored 0.8 or higher and were added to the map.</div>`;
+    html += `</table><div class="note">Bold tests scored ${THRESHOLD} or higher, so Jev added them to the map.</div>`;
     if (t.positive) {
-      html += `<h4>Top suggestion</h4><table>
-        <tr><td>Graphify and keywords: <code>${escape(short(t.before || "none"))}</code></td><td class="v">${verdict(t.beforeHit)}</td></tr>
+      html += `<h4>First suggested test</h4><table>
+        <tr><td>Without Jev: <code>${escape(short(t.before || "none"))}</code></td><td class="v">${verdict(t.beforeHit)}</td></tr>
         <tr><td>With Jev: <code>${escape(short(t.after || "none"))}</code></td><td class="v">${verdict(t.afterHit)}</td></tr></table>`;
     }
-    html += `<h4>Tests that ran it: ${t.observed.length}</h4>` + (t.observed.length
+    html += `<h4>Tests that really ran it: ${t.observed.length}</h4>` + (t.observed.length
       ? `<table>${t.observed.slice(0, 10).map(x => `<tr><td><code>${escape(short(x))}</code></td></tr>`).join("")}</table>` +
         (t.observed.length > 10 ? `<div class="note">and ${t.observed.length - 10} more</div>` : "")
-      : `<div class="note">None of the profiled tests called it.</div>`);
+      : `<div class="note">None of the tests we ran called it.</div>`);
   } else {
     const links = repo.overlay.filter(l => l.t === n.i && l.jev);
     if (links.length) {
@@ -431,7 +531,7 @@ function renderDetail() {
         `<tr><td><code>${escape(short(repo.nodes[l.f].target ? repo.nodes[l.f].target.symbol : repo.nodes[l.f].label))}</code></td>
          <td class="n">${l.score.toFixed(2)}</td><td class="v">${verdict(l.observed)}</td></tr>`).join("") + `</table>`;
     }
-    html += `<div class="note">${plural(n.degree, "edge", "edges")} in Graphify's graph.</div>`;
+    html += `<div class="note">${plural(n.degree, "connection", "connections")} in Graphify's graph.</div>`;
   }
   el.innerHTML = html;
 }
@@ -467,8 +567,18 @@ function strike(l, alpha) {
   ctx.beginPath(); ctx.moveTo(x - s, y - s); ctx.lineTo(x + s, y + s); ctx.moveTo(x + s, y - s); ctx.lineTo(x - s, y + s); ctx.stroke();
 }
 function inked(l, p, alpha = 1) {
-  if (l.observed) stroke(l, C.blue, 2.2, p, alpha, null);
-  else { stroke(l, C.red, 1.8, p, alpha, [3, 3]); if (p >= 1) strike(l, alpha); }
+  if (l.observed) stroke(l, C.blue, 2.4, p, alpha, null);
+  else { stroke(l, C.red, 2, p, alpha, [3, 3]); if (p >= 1) strike(l, alpha); }
+}
+
+// Nodes the current step is about stay at full strength; everything else steps back.
+function activeNodes(key) {
+  const ends = ls => new Set(ls.flatMap(l => [l.f, l.t]));
+  if (key === "example") return new Set(exampleNodes().map(n => n.i));
+  if (key === "jev" || key === "verify") return ends(repo.overlay.filter(l => l.jev));
+  if (key === "keyword") return ends(repo.overlay.filter(l => l.keyword));
+  if (key === "first") return new Set(repo.targets.filter(t => t.positive && t.afterNode !== null).flatMap(t => [t.node, t.afterNode]));
+  return null;
 }
 
 function frame(now) {
@@ -481,7 +591,8 @@ function frame(now) {
   ctx.setTransform(DPR * transform.k, 0, 0, DPR * transform.k, DPR * transform.x, DPR * transform.y);
   ctx.lineCap = "round";
 
-  const quiet = key === "map" ? 1 : key === "limits" ? 0.4 : 0.6;
+  const quiet = key === "map" ? 1 : key === "intro" ? 0.6 : key === "example" ? 0.3 : 0.4;
+  const active = activeNodes(key);
   const focus = selected ? new Set([selected.i, ...repo.overlay.filter(l => l.f === selected.i || l.t === selected.i).flatMap(l => [l.f, l.t])]) : null;
 
   // Graphify's own edges, drawn as faint graphite.
@@ -493,17 +604,23 @@ function frame(now) {
   ctx.stroke();
 
   const acc = repo.overlay.filter(l => l.jev);
-  if (key === "jev") {
+  if (key === "example") {
+    for (const l of repo.example.links) {
+      const p = ease((el - 0.9 - l.k * 0.35) / 0.6);
+      if (l.score >= THRESHOLD) stroke(l, C.pencil, 2.2, p, 1, [5, 3]);
+      else stroke(l, C.graphite, 1.4, p, 0.9, [1.5, 3]);
+    }
+  } else if (key === "jev") {
     const n = repo.overlay.length;
     for (const l of repo.overlay) {
       if (l.jev) continue;
       const fade = 1 - ease((el - 1.8 - (l.i / n) * 0.6) / 0.6);
       stroke(l, C.graphite, 0.9, ease((el - 0.2 - (l.i / n) * 0.9) / 0.4), 0.55 * fade, [1.5, 3]);
     }
-    for (const l of acc) stroke(l, C.pencil, 1.5, ease((el - 1.4 - l.order * 1.6) / 0.6), 0.9, [4, 3]);
+    for (const l of acc) stroke(l, C.pencil, 2, ease((el - 1.4 - l.order * 1.6) / 0.6), 0.95, [5, 3]);
   } else if (key === "verify") {
     for (const l of acc) {
-      stroke(l, C.pencil, 1.5, 1, 0.5, [4, 3]);
+      stroke(l, C.pencil, 2, 1, 0.5, [5, 3]);
       inked(l, ease((el - 0.4 - l.order * 2.2) / 0.5));
     }
   } else if (key === "keyword") {
@@ -514,29 +631,38 @@ function frame(now) {
       if (!t.positive || t.afterNode === null) continue;
       const changed = t.beforeHit !== t.afterHit;
       const l = { a: repo.nodes[t.node], b: repo.nodes[t.afterNode], observed: t.afterHit };
-      inked(l, ease((el - 0.3) / 0.8), changed ? 1 : 0.22);
+      inked(l, ease((el - 0.3) / 0.8), changed ? 1 : 0.3);
     }
   }
 
   // Nodes: shape says what it is, color is saved for verdicts.
   for (const n of repo.nodes) {
+    const on = active && active.has(n.i);
     let alpha = n.target ? 1 : n.kind === "test" ? 0.85 : n.kind === "module" ? 0.55 : 0.8;
-    if (!n.target && key !== "map") alpha *= key === "limits" ? 0.5 : 0.75;
+    if (!on && !n.target && key !== "map") alpha *= key === "intro" ? 0.7 : 0.45;
+    if (key === "example" && !on && n.target) alpha *= 0.35;
     if (focus && !focus.has(n.i)) alpha *= 0.3;
     ctx.globalAlpha = alpha;
     if (n.target) {
       ctx.fillStyle = C.paper; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5 / transform.k;
       ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 7); ctx.fill(); ctx.stroke();
     } else if (n.kind === "test") {
-      const s = Math.max(n.r, 2.2) * 0.9;
-      ctx.fillStyle = C.ink2; ctx.fillRect(n.x - s, n.y - s, 2 * s, 2 * s);
+      const s = Math.max(n.r, on ? 3 : 2.2) * 0.9;
+      ctx.fillStyle = on ? C.ink : C.ink2; ctx.fillRect(n.x - s, n.y - s, 2 * s, 2 * s);
     } else {
       ctx.fillStyle = C.graphite;
       ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 7); ctx.fill();
     }
   }
 
-  if (key === "first") {
+  if (key === "example") {
+    const ex = repo.example, fn = repo.nodes[ex.node];
+    label(fn, short(ex.symbol), C.ink, ease(el / 0.4));
+    for (const l of ex.links) {
+      const hit = l.score >= THRESHOLD;
+      label(l.b, `${short(l.test)}  ${l.score.toFixed(2)}`, hit ? C.ink : C.ink2, ease((el - 1.3 - l.k * 0.35) / 0.4));
+    }
+  } else if (key === "first") {
     const p = ease((el - 0.9) / 0.5);
     for (const t of repo.targets) {
       if (!t.positive || t.beforeHit === t.afterHit) continue;

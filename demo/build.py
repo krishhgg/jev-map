@@ -153,6 +153,7 @@ def study_data(study: dict, benchmarks: Path) -> tuple[dict, list[dict]] | None:
               "positive": methods["graphify_lexical"]["positive_targets"],
               "jevSeconds": summary["provider_wall_seconds_sum"],
               "jevRequests": summary["provider_requests"],
+              "jevErrors": summary["provider_errors"],
               "primaryGate": summary["primary"]["frozen_gate_supported"],
               "edgeGate": summary["edge_filter"]["frozen_gate_supported"]}
     repos = [repository(study, round_dir, name, pairs, rankings, keyword, summary)
