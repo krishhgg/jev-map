@@ -2,7 +2,7 @@
 
 Reads immutable rounds only; nothing is recomputed or re-scored. Benchmark 07
 (popular repositories) is included when its live round exists.
-Usage: python demo/build.py [--out demo/jev-map-graph.html] [--benchmarks DIR]
+Usage: python demo/build.py [--out demo/jev-map-graph.html] [--benchmarks DIR] [--site-url URL]
 """
 
 from __future__ import annotations
@@ -161,7 +161,7 @@ def study_data(study: dict, benchmarks: Path) -> tuple[dict, list[dict]] | None:
     return pooled, repos
 
 
-def build(out: Path, benchmarks: Path) -> None:
+def build(out: Path, benchmarks: Path, site_url: str | None = None) -> None:
     studies, repositories = {}, []
     for study in STUDIES:
         loaded = study_data(study, benchmarks)
@@ -170,7 +170,15 @@ def build(out: Path, benchmarks: Path) -> None:
             repositories += repos
     data = {"studies": studies, "repositories": repositories}
     template = (HERE / "template.html").read_text()
-    out.write_text(template.replace("/*__DATA__*/null", json.dumps(data, separators=(",", ":"))))
+    # Link previews need absolute URLs, so they're only written when the page has a public home.
+    site_meta = ""
+    if site_url:
+        base = site_url.rstrip("/")
+        site_meta = (f'<meta property="og:url" content="{base}/">\n'
+                     f'<meta property="og:image" content="{base}/preview.png">\n'
+                     f'<meta name="twitter:image" content="{base}/preview.png">')
+    page = template.replace("<!--__SITE_META__-->", site_meta)
+    out.write_text(page.replace("/*__DATA__*/null", json.dumps(data, separators=(",", ":"))))
     print(f"wrote {out} ({out.stat().st_size // 1024} KiB): "
           + ", ".join(f"{repo['name']} {repo['shownNodes']}/{repo['totalNodes']} nodes" for repo in repositories))
 
@@ -178,9 +186,10 @@ def build(out: Path, benchmarks: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=HERE / "jev-map-graph.html")
+    parser.add_argument("--site-url", help="public URL the page is served from, for link-preview tags")
     parser.add_argument("--benchmarks", type=Path, default=HERE.parent / "benchmarks")
     args = parser.parse_args()
-    build(args.out, args.benchmarks)
+    build(args.out, args.benchmarks, args.site_url)
 
 
 if __name__ == "__main__":
