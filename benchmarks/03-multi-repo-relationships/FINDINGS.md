@@ -10,7 +10,7 @@ skip.
 ## Frozen result
 
 The protocol and 72-request sample were frozen and reviewed in
-[PR #5](https://github.com/kgarg2468/jev-map/pull/5) before any live scores or
+[PR #5](https://github.com/krishhgg/jev-map/pull/5) before any live scores or
 isolated execution labels were collected. All candidate pairs were absent from
 the structural map by construction.
 

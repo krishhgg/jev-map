@@ -6,7 +6,7 @@ It supports neither replacing
 Graphify nor a claim that a coding agent completes work faster or cheaper.
 
 The [protocol](PROTOCOL.md) and [source-only freeze](rounds/round-00-freeze)
-were committed in [PR #8](https://github.com/kgarg2468/jev-map/pull/8)
+were committed in [PR #8](https://github.com/krishhgg/jev-map/pull/8)
 before the live Jev responses or new per-test call traces were collected.
 The 144 target functions are disjoint from benchmark 03's targets. All three
 pinned repositories passed preflight and profiled full-suite execution; Jev
