@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="en" data-theme="paper">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which tests run this function? | jev-map</title>
+<meta name="description" content="What I found testing Jev, a system 1 model. I asked it which tests run 240 functions in Flask, FastAPI, LangChain, yt-dlp and Graphify, then ran the tests to check every answer.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Which tests run this function? | jev-map">
+<meta property="og:description" content="I asked Jev which tests run 240 functions in five popular repos, then ran the tests to check every answer.">
+<meta name="twitter:card" content="summary_large_image">
+<!--__SITE_META__-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:ital,wght@0,400..800;1,400..800&family=Overpass+Mono:wght@400;600&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<style>
+  /* Engineering-pad paper. Blue ink and red strike were validated as a pair
+     (CVD and normal-vision separation, 3:1 against the surface) in both themes. */
+  :root[data-theme="paper"] {
+    color-scheme: light;
+    --paper: #e8ece4; --grid: #dbe1d6; --grid-major: #ccd4c7; --rule: #aeb8ae;
+    --ink: #1e2621; --ink2: #4f5a53; --pencil: #3a423d; --graphite: #8b958d;
+    --blue: #2458a8; --red: #c23a30;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #1c231f; --grid: #232c27; --grid-major: #2b352f; --rule: #3f4a43;
+    --ink: #e4e9e2; --ink2: #a7b1a9; --pencil: #cfd6d0; --graphite: #66716a;
+    --blue: #5b8fdd; --red: #e0564b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    color: var(--ink); background-color: var(--paper);
+    font: 400 15px/1.5 Overpass, ui-sans-serif, sans-serif;
+    background-image:
+      linear-gradient(var(--grid-major) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; cursor: grab; }
+  canvas.dragging { cursor: grabbing; }
+  #sheet { position: fixed; inset: 12px; border: 1px solid var(--rule); pointer-events: none; }
+  .box { position: fixed; background: var(--paper); border: 1px solid var(--rule); }
+  button, select { font: inherit; color: inherit; }
+  button { background: none; border: 0; padding: 0; cursor: pointer; }
+  button:focus-visible, select:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  code, .mono { font-family: "Overpass Mono", ui-monospace, monospace; font-size: 0.9em; }
+
+  #story { left: 28px; bottom: 28px; width: min(480px, calc(100vw - 56px)); padding: 20px 22px 18px; }
+  #story .kicker { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink2); margin-bottom: 4px; }
+  #story h2 { margin: 0 0 8px; font-weight: 800; font-size: 29px; line-height: 1.1; letter-spacing: -0.015em; }
+  #story p { margin: 0; color: var(--ink2); max-width: 48ch; }
+  #story p code { color: var(--ink); word-break: break-word; }
+  #story p strong { color: var(--ink); font-weight: 700; }
+  #figure:empty { display: none; }
+  #figure { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .num { font-weight: 800; font-size: 50px; line-height: 1; letter-spacing: -0.02em; }
+  .num small { font-size: 20px; font-weight: 600; letter-spacing: 0; color: var(--ink2); }
+  .cap { color: var(--ink2); font-size: 13.5px; margin-top: 6px; max-width: 50ch; }
+  .bars { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 12px; align-items: center; font-size: 14px; }
+  .bars .name { font-weight: 600; }
+  .bars .val { font-variant-numeric: tabular-nums; color: var(--ink2); }
+  .stack { display: flex; gap: 2px; height: 12px; }
+  .stack span { display: block; height: 100%; transition: flex-grow 900ms cubic-bezier(.2,.7,.2,1); flex-grow: 0; flex-basis: 0; }
+  .stack .yes { background: var(--blue); }
+  .stack .no { background: repeating-linear-gradient(135deg, var(--red) 0 2px, transparent 2px 5px); border: 1px solid var(--red); }
+  /* One row per candidate test: name, score bar with the 0.8 cutoff, score, outcome. */
+  .cands { display: grid; grid-template-columns: minmax(0, 1fr) 84px 34px 64px; gap: 7px 10px; align-items: center; font-size: 13.5px; }
+  .cands code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink2); }
+  .cands .meter { position: relative; height: 10px; border: 1px solid var(--rule); }
+  .cands .meter i { position: absolute; inset: 0 auto 0 0; background: var(--graphite); transition: width 700ms cubic-bezier(.2,.7,.2,1); }
+  .cands .meter::after { content: ""; position: absolute; left: 80%; top: -4px; bottom: -4px; border-left: 2px solid var(--ink); }
+  .cands .val { font-variant-numeric: tabular-nums; text-align: right; }
+  .cands .out { color: var(--ink2); }
+  .cands .on code, .cands .on .out { color: var(--ink); font-weight: 700; }
+  .cands .on .meter i { background: var(--ink); }
+
+  #block { right: 28px; bottom: 28px; width: 410px; display: grid; grid-template-columns: 1fr auto; }
+  #block > div, #block > label { padding: 10px 16px; border-top: 1px solid var(--rule); }
+  #block > div:nth-child(-n+2) { border-top: 0; }
+  #block .name { font-weight: 800; font-size: 32px; line-height: 1.05; letter-spacing: -0.015em; padding-top: 16px; }
+  #block .sheetno { border-left: 1px solid var(--rule); font-size: 14px; color: var(--ink2); text-align: right; padding-top: 14px; }
+  #block .sheetno b { color: var(--ink); font-weight: 800; font-size: 24px; display: block; }
+  #block .wide { grid-column: 1 / -1; }
+  #block .sub { font-style: italic; font-size: 16px; color: var(--ink2); padding-top: 0; border-top: 0; }
+  .row { display: flex; align-items: center; gap: 6px; font-size: 16px; }
+  .row .lbl { color: var(--ink2); width: 96px; flex: none; font-size: 14px; }
+  select { flex: 1; min-width: 0; height: 40px; padding: 0 10px; font-size: 16px; font-weight: 600;
+    background: var(--paper); border: 1px solid var(--rule); cursor: pointer; }
+  select:hover { border-color: var(--ink); }
+  /* Each step is a boxed cell 40px tall so it's easy to hit. */
+  #steps { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; width: 100%; }
+  #steps button { height: 40px; border: 1px solid var(--rule); color: var(--ink2); font-size: 16px;
+    transition: border-color 120ms, background-color 120ms; }
+  #steps button:hover { border-color: var(--ink); color: var(--ink); }
+  #steps button.on { background: var(--ink); border-color: var(--ink); color: var(--paper); font-weight: 700; }
+  .nav { display: grid; grid-template-columns: 1fr 1.6fr; gap: 6px; }
+  .nav button { height: 44px; border: 1px solid var(--ink); font-size: 16px; font-weight: 700; }
+  .nav button:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
+  .nav button:disabled { border-color: var(--rule); color: var(--rule); cursor: default; }
+  #block .foot { font-size: 13px; color: var(--ink2); line-height: 1.45; }
+
+  #key { left: 28px; top: 28px; padding: 10px 14px 10px 12px; font-size: 13px; }
+  #key h4 { margin: 0 0 4px; font-size: 13px; font-weight: 700; }
+  #key div { display: flex; align-items: center; gap: 9px; margin: 3px 0; color: var(--ink2); }
+  #key div[hidden] { display: none; }
+  #key svg { width: 28px; height: 12px; flex: none; overflow: visible; }
+
+  #detail { right: 28px; top: 28px; width: 360px; overflow: auto; padding: 14px 16px; display: none; }
+  #detail h3 { margin: 0 32px 2px 0; font: 600 16px/1.3 "Overpass Mono", monospace; word-break: break-word; }
+  #detail .file { color: var(--ink2); font-size: 12.5px; word-break: break-all; }
+  #detail h4 { margin: 14px 0 4px; font-size: 13px; font-weight: 700; }
+  #detail table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #detail td { padding: 4px 0; border-top: 1px solid var(--rule); vertical-align: top; }
+  #detail td code { word-break: break-word; }
+  #detail td.n { text-align: right; font-variant-numeric: tabular-nums; width: 64px; }
+  #detail td.v { text-align: right; width: 60px; font-weight: 600; }
+  #detail .yes { color: var(--blue); } #detail .no { color: var(--red); } #detail .none { color: var(--ink2); }
+  #detail .hi { font-weight: 700; }
+  #detail .note { color: var(--ink2); font-size: 12.5px; margin-top: 6px; }
+  #close { position: absolute; right: 10px; top: 8px; font-size: 20px; line-height: 1; color: var(--ink2); padding: 2px 6px; }
+
+  #tip { position: fixed; pointer-events: none; padding: 5px 9px; font-size: 12.5px; background: var(--paper);
+    border: 1px solid var(--rule); display: none; max-width: 420px; }
+  #tip .f { color: var(--ink2); }
+  body.clean #key, body.clean #block .foot { display: none; }
+
+  /* Phones, and any short screen: the story sits at the top, the controls at the
+     bottom, and the graph between them. */
+  @media (max-width: 700px), (max-height: 520px) {
+    body { font-size: 14px; }
+    #sheet { inset: 6px; }
+    #key { display: none; }
+    #story { left: 10px; right: 10px; top: 10px; bottom: auto; width: auto; max-height: 46vh; overflow: auto; padding: 12px 14px; }
+    #story .kicker { font-size: 11px; }
+    #story h2 { font-size: 21px; margin-bottom: 6px; }
+    #story p { max-width: none; }
+    #figure { margin-top: 10px; padding-top: 10px; }
+    .num { font-size: 34px; } .num small { font-size: 15px; }
+    .cands { grid-template-columns: minmax(0, 1fr) 56px 30px 58px; gap: 6px 8px; font-size: 12.5px; }
+    #block { left: 10px; right: 10px; bottom: 10px; width: auto; }
+    #block > div, #block > label { padding: 8px 12px; }
+    #block .name { font-size: 22px; padding-top: 10px; }
+    #block .sheetno { padding-top: 10px; }
+    #block .sheetno b { display: inline; font-size: 18px; margin-left: 4px; }
+    #block .sub, #block .foot { display: none; }
+    #steps button { height: 34px; font-size: 14px; }
+    .nav button { height: 40px; }
+    #detail { left: 10px; right: 10px; top: 10px; width: auto; }
+  }
+  /* Phones held sideways: shrink the story and drop the step buttons, since Back and Next remain. */
+  @media (max-height: 520px) {
+    #story { max-height: 40vh; }
+    #block .name { font-size: 18px; padding-top: 8px; }
+    #block .steprow { display: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="stage" aria-label="Graphify code graph with Jev's test links"></canvas>
+<div id="sheet"></div>
+
+<!-- Each step shows only the key entries for what's on screen. -->
+<div id="key" class="box" aria-label="Key">
+  <h4>Key</h4>
+  <div data-k="fn"><svg viewBox="0 0 28 12"><circle cx="14" cy="6" r="4.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/></svg>Function I picked</div>
+  <div data-k="code"><svg viewBox="0 0 28 12"><circle cx="14" cy="6" r="3" fill="var(--graphite)"/></svg>Other code</div>
+  <div data-k="test"><svg viewBox="0 0 28 12"><rect x="11" y="3" width="6" height="6" fill="var(--ink2)"/></svg>Test</div>
+  <div data-k="edge"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--graphite)" stroke-width="1"/></svg>Call or import Graphify found</div>
+  <div data-k="added"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--pencil)" stroke-width="2" stroke-dasharray="5 3"/></svg>Jev said yes, 0.8 or higher</div>
+  <div data-k="rejected"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--graphite)" stroke-width="1.4" stroke-dasharray="1.5 3"/></svg>Jev said no, under 0.8</div>
+  <div data-k="ran"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--blue)" stroke-width="2.2"/></svg>The test ran the function</div>
+  <div data-k="didnt"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--red)" stroke-width="1.8" stroke-dasharray="3 3"/><path d="M11 2 l6 8 M17 2 l-6 8" stroke="var(--red)" stroke-width="1.8"/></svg>The test didn't run it</div>
+  <div data-k="better"><svg viewBox="0 0 28 12"><circle cx="14" cy="6" r="5.5" fill="none" stroke="var(--blue)" stroke-width="2"/></svg>First suggestion got better</div>
+  <div data-k="worse"><svg viewBox="0 0 28 12"><circle cx="14" cy="6" r="5.5" fill="none" stroke="var(--red)" stroke-width="2"/></svg>First suggestion got worse</div>
+</div>
+
+<section id="story" class="box" aria-live="polite">
+  <div class="kicker" id="kicker"></div>
+  <h2 id="title"></h2>
+  <p id="body"></p>
+  <div id="figure"></div>
+</section>
+
+<div id="block" class="box">
+  <div class="name">jev-map</div>
+  <div class="sheetno">Step<b id="sheetno">1 of 8</b></div>
+  <div class="wide sub">Which tests run this function?</div>
+  <label class="wide row"><span class="lbl">Repository</span><select id="repo"></select></label>
+  <div class="wide steprow"><div id="steps"></div></div>
+  <div class="wide nav"><button id="prev">Back</button><button id="next">Next</button></div>
+  <div class="wide foot"><span id="source"></span>
+    Use the arrow keys to move between steps. Click any circle for details, and press D for dark mode.</div>
+</div>
+
+<aside id="detail" class="box"></aside>
+<div id="tip"></div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const study = () => DATA.studies[repo.study];
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const pct = (a, b) => b ? Math.round(100 * a / b) : 0;
+const short = s => s.split("::").pop();
+const ease = t => t <= 0 ? 0 : t >= 1 ? 1 : 1 - Math.pow(1 - t, 3);
+const fmt = n => n.toLocaleString("en-US");
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const words = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+const say = n => n <= 10 ? words[n] : String(n);
+const cap = s => s[0].toUpperCase() + s.slice(1);
+const escape = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const code = s => `<code>${escape(s)}</code>`;
+const THRESHOLD = 0.8;
+
+// ---------- the eight steps ----------
+// Each step says what is on screen in plain words, in first person. A technical
+// term is bolded and defined the first time it shows up. `legend` lists the key rows it needs.
+const place = r => `${r.name}, study ${DATA.studies[r.study].number}`;
+const term = s => `<strong>${s}</strong>`;
+const SCENES = [
+  { key: "intro", legend: ["fn", "code", "test", "edge"], kicker: () => "What I found testing Jev",
+    title: () => "Which tests run this function?",
+    body: () => "When you change a function, you want to run the tests that use it. Finding those tests is harder than it sounds. " +
+      `Tests usually reach code indirectly, through ${term("fixtures")}, which is setup code that runs before a test. ` +
+      "So tools that only read the code miss a lot of these links. I asked Jev, TypeSafe's system 1 model, a quick yes " +
+      "or no question about each test. Does this test run this function? Then I ran the tests to check every answer.",
+    figure: () => `<div class="cap">It's 8 short steps. Hit Next or the right arrow key to go through them.</div>` },
+  { key: "map", legend: ["fn", "code", "test", "edge"], kicker: place,
+    title: () => "First, Graphify maps the code",
+    body: r => `${term("Graphify")} is an open-source tool that turns a codebase into a graph. It read ${r.name}'s code and ` +
+      `drew this in ${r.graphify.wall_seconds.toFixed(1)} seconds, with no AI model involved. Dots are functions, classes ` +
+      `and files. Squares are tests. Lines are the calls and imports Graphify found. The ${r.targets.length} open circles ` +
+      `are the functions I tested. I picked them at random before seeing any results, using a fixed ${term("seed")}, the ` +
+      `number that controls the random picks, so anyone can get the same ones.` +
+      (r.shownNodes < r.totalNodes ? ` This view only shows the ${fmt(r.shownNodes)} nodes closest to them, out of ${fmt(r.totalNodes)}.` : ""),
+    figure: () => "" },
+  { key: "example", legend: ["fn", "test", "added", "rejected"], kicker: place,
+    title: () => "Jev checks one function",
+    body: r => {
+      const ex = r.example, n = ex.candidates.length;
+      return `Take ${code(short(ex.symbol))}. First, ${term("keyword search")} picks ${say(n)} tests that might run it. ` +
+        "It ranks tests by the words they share with the function, and rare words count more. Then Jev reads the function " +
+        `and each test and scores each pair from 0 to 1. All ${say(n)} scores come back in one request, in about ` +
+        `${(study().jevSeconds / study().jevRequests).toFixed(2)} seconds on average. Anything at ${THRESHOLD} or higher ` +
+        "counts as a yes and goes on the map.";
+    },
+    figure: r => {
+      const rows = r.example.candidates.map(c => `<div class="cand${c.score >= THRESHOLD ? " on" : ""}" style="display:contents">
+          <code title="${escape(c.test)}">${escape(short(c.test))}</code>
+          <span class="meter"><i style="width:0" data-w="${Math.round(c.score * 100)}%"></i></span>
+          <span class="val">${c.score.toFixed(2)}</span>
+          <span class="out">${c.score >= THRESHOLD ? "added" : "not added"}</span></div>`).join("");
+      return `<div class="cands">${rows}</div>
+        <div class="cap">The tick on each bar is the ${THRESHOLD} cutoff. Jev hasn't seen any test results at this point.</div>`;
+    } },
+  { key: "jev", legend: ["fn", "test", "added"], kicker: place,
+    title: () => "Jev's links across the whole repo",
+    body: r => {
+      const acc = r.overlay.filter(l => l.jev), known = acc.filter(l => l.graphify).length;
+      const note = known === 0 ? "Graphify's graph didn't have any of them."
+        : `Graphify's graph only had ${say(known)} of them.`;
+      return `Jev did the same check for all ${r.targets.length} circled functions. Out of ${r.overlay.length} possible ` +
+        `links, it said yes to ${acc.length}. ${note}`;
+    },
+    figure: r => `<div class="num">${r.overlay.filter(l => l.jev).length} <small>new links in ${r.name}</small></div>` },
+  { key: "verify", legend: ["fn", "test", "ran", "didnt"], kicker: place,
+    title: () => "Then I ran the tests",
+    body: r => {
+      const missed = r.overlay.filter(l => l.observed && !l.jev).length;
+      return `To check Jev's answers, I ran every test with a ${term("tracer")}, a tool that records every function a test ` +
+        "calls. Blue means the test did call the function. Red means it didn't." +
+        (missed ? ` Jev also skipped ${missed} ${missed === 1 ? "link" : "links"} that the tests did run. So if a link isn't ` +
+          "on the map, that doesn't mean the test is unrelated." : "");
+    },
+    figure: r => {
+      const acc = r.overlay.filter(l => l.jev), ok = acc.filter(l => l.observed).length, e = study().edge.jev;
+      return `<div class="num">${ok} <small>of ${acc.length} were right</small></div>
+        <div class="cap">That's ${r.name}. Across all ${study().repoCount} repos in this study, Jev got ` +
+        `${e.observed} of ${e.emitted_eligible} right, which is ${pct(e.observed, e.emitted_eligible)}%.</div>`;
+    } },
+  { key: "keyword", legend: ["fn", "test", "ran", "didnt"], kicker: place,
+    title: () => "Could keyword search do this by itself?",
+    body: r => {
+      const n = r.overlay.filter(l => l.keyword).length;
+      const here = n === 0 ? `None of those picks are in ${r.name}.`
+        : n === 1 ? `One of them is in ${r.name}. It's drawn here, and Jev's links are faded out.`
+        : `${cap(say(n))} of them are in ${r.name}. They're drawn here, and Jev's links are faded out.`;
+      return "Keyword search picked the candidates in the first place, so maybe Jev is just repeating it. To test that, " +
+        `I took keyword search's top ${study().edge.jev.emitted_eligible} links across the ${study().repoCount} repos, ` +
+        `the same number Jev said yes to, and checked them the same way. ${here}`;
+    },
+    figure: () => {
+      const j = study().edge.jev, k = study().edge.lexical_equal_count;
+      const bar = (name, e) => `<span class="name">${name}</span>
+        <span class="stack"><span class="yes" data-g="${e.observed}"></span><span class="no" data-g="${e.emitted_eligible - e.observed}"></span></span>
+        <span class="val">${e.observed} of ${e.emitted_eligible}, ${pct(e.observed, e.emitted_eligible)}%</span>`;
+      return `<div class="bars">${bar("Jev", j)}${bar("Keywords", k)}</div>
+        <div class="cap">Each bar shows how many of the ${j.emitted_eligible} picks the tracer confirmed.` +
+        (study().edgeGate ? "" : " I set the rules for this study before running it. By those rules this doesn't count " +
+          `as a pass, because ${study().jevErrors} of Jev's ${study().jevRequests} requests failed and the rules allowed zero failures.`) +
+        `</div>`;
+    } },
+  { key: "first", legend: ["fn", "ran", "didnt", "better", "worse"], kicker: place,
+    title: () => "Did the first suggestion get better?",
+    body: r => {
+      const intro = "For each function, jev-map ranks the tests and suggests one to open first. Each line goes from a function to that first test. ";
+      const pos = r.targets.filter(t => t.positive);
+      const gain = pos.filter(t => !t.beforeHit && t.afterHit).length, loss = pos.filter(t => t.beforeHit && !t.afterHit).length;
+      if (!gain && !loss) return intro + `Adding Jev's links didn't fix or break the first suggestion for any function in ${r.name}. ` +
+        "Any changes came from the other repos in this study.";
+      const fns = n => `${say(n)} ${n === 1 ? "function" : "functions"}`;
+      const better = gain ? `fixed the first suggestion for ${fns(gain)} in ${r.name}, circled in blue` : "";
+      const worse = loss ? `made ${gain ? "it" : "the first suggestion"} worse for ${fns(loss)}${gain ? "" : ` in ${r.name}`}, circled in red` : "";
+      return intro + `Adding Jev's links ${[better, worse].filter(Boolean).join(", and ")}.`;
+    },
+    figure: () => `<div class="num">${study().hitAfter} <small>of ${study().positive} with Jev</small></div>
+      <div class="cap">That's how many functions got a first suggestion that runs them, across the ${study().repoCount} repos. ` +
+      `Without Jev it was ${study().hitBefore}. I left out functions that no test runs.` +
+      (study().primaryGate ? "" : " It's a smaller gain than I said up front I'd need to call it a win.") + `</div>` },
+  { key: "limits", legend: ["fn", "code", "test"], kicker: () => "A separate study",
+    title: () => "Where it didn't help",
+    body: () => `I gave Jev's hints to a coding agent that already had Graphify, ${term("ripgrep")} for searching code, and ` +
+      `${term("pytest")} for running tests. Its job was to find a test that runs each of 24 functions in three other repos. ` +
+      `It got 23 right with Jev's hints and 23 without. Hints from a small ${term("LLM")}, short for large language model, ` +
+      "got 24 but cost about ten times as much to make. So Jev made the map better, but the agent didn't need it.",
+    figure: () => `<div class="num">23 <small>of 24, with or without Jev</small></div>
+      <div class="cap">This is from study 06, which used cachetools, Tenacity and attrs, with one agent run per task.</div>` },
+];
+
+// ---------- state ----------
+const canvas = document.getElementById("stage");
+const ctx = canvas.getContext("2d");
+let W = 0, H = 0, DPR = 1, C = {};
+let repo = null, sim = null, transform = d3.zoomIdentity;
+let scene = 0, sceneStart = performance.now(), framing = null;
+let hover = null, selected = null;
+
+function readTheme() {
+  const s = getComputedStyle(document.documentElement);
+  for (const k of ["paper", "ink", "ink2", "pencil", "graphite", "blue", "red", "rule"]) C[k] = s.getPropertyValue("--" + k).trim();
+}
+function setTheme(name) {
+  document.documentElement.dataset.theme = name;
+  readTheme();
+}
+setTheme(new URLSearchParams(location.search).get("theme") === "dark" ? "dark" : "paper");
+
+function resize() {
+  DPR = window.devicePixelRatio || 1;
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR;
+}
+// A phone's address bar showing or hiding fires resize, so only reframe if the
+// visitor hasn't moved the graph themselves.
+let userMoved = false;
+window.addEventListener("resize", () => {
+  resize();
+  if (repo && !userMoved) framing === "example" ? frameNodes(exampleNodes(), false) : fit(false);
+});
+resize();
+
+// The worked example is the first sampled function, in study order, where Jev
+// both added and rejected a candidate. Its outcome is shown as recorded.
+function pickExample(targets) {
+  const usable = t => t.candidates.length >= 2;
+  return targets.find(t => usable(t) && t.candidates.some(c => c.score >= THRESHOLD) && t.candidates.some(c => c.score < THRESHOLD))
+    || targets.find(usable) || targets[0];
+}
+
+function load(index) {
+  const source = DATA.repositories[index];
+  if (sim) sim.stop();
+  const nodes = source.nodes.map((n, i) => ({ ...n, i, degree: 0 }));
+  const seen = new Set(), links = [];
+  for (const [s, t, relation] of source.edges) {
+    const key = s < t ? `${s}-${t}` : `${t}-${s}`;
+    if (s === t || seen.has(key)) continue;
+    seen.add(key);
+    links.push({ source: s, target: t, relation });
+    nodes[s].degree++; nodes[t].degree++;
+  }
+  const targets = new Map(source.targets.map(t => [t.node, t]));
+  for (const n of nodes) {
+    n.target = targets.get(n.i) || null;
+    n.r = n.target ? 4 : 1.5 + Math.sqrt(n.degree) * (n.kind === "module" ? 1.0 : 0.6);
+  }
+  const overlay = source.links.map((l, i) => ({ ...l, i, a: nodes[l.f], b: nodes[l.t] }));
+  const accepted = overlay.filter(l => l.jev).sort((x, y) => y.score - x.score);
+  accepted.forEach((l, k) => { l.order = k / Math.max(1, accepted.length - 1); });
+  overlay.filter(l => l.keyword).forEach((l, k, all) => { l.korder = k / Math.max(1, all.length - 1); });
+  const ex = pickExample(source.targets);
+  const example = { ...ex, candidates: [...ex.candidates].sort((x, y) => y.score - x.score) };
+  example.links = example.candidates.map((c, k) => ({ a: nodes[ex.node], b: nodes[c.node], score: c.score, test: c.test, k }));
+  repo = { ...source, nodes, links, overlay, index, example };
+
+  sim = d3.forceSimulation(nodes)
+    .force("link", d3.forceLink(links).distance(l => l.relation === "contains" || l.relation === "method" ? 14 : 38)
+      .strength(l => l.relation === "contains" || l.relation === "method" ? 0.9 : 0.08))
+    .force("charge", d3.forceManyBody().strength(nodes.length > 1000 ? -18 : -40).distanceMax(420))
+    .force("x", d3.forceX().strength(0.035))
+    .force("y", d3.forceY().strength(0.045))
+    .force("collide", d3.forceCollide(n => n.r + 1.5))
+    .alphaDecay(0.018)
+    // The close-up is framed while the layout is still settling, so reframe once it stops.
+    .on("end", () => { if (framing === "example") frameNodes(exampleNodes(), true); });
+  for (let k = 0; k < (REDUCED ? 300 : 60); k++) sim.tick();
+  if (REDUCED) sim.stop();
+  selected = null; renderDetail();
+  document.getElementById("repo").value = String(index);
+  const st = DATA.studies[source.study];
+  document.getElementById("source").textContent = `These are recorded results from study ${st.number}, which covers ` +
+    `${st.targets} functions in ${st.repoCount} repos. Nothing re-runs in your browser.`;
+  framing = null;
+  setScene(scene, false);
+}
+
+const exampleNodes = () => [repo.nodes[repo.example.node], ...repo.example.links.map(l => l.b)];
+
+// Fit the given nodes into the space between the key, the story box and the control block.
+function frameNodes(nodes, animate) {
+  const [x0, x1] = d3.extent(nodes, n => n.x), [y0, y1] = d3.extent(nodes, n => n.y);
+  const block = document.getElementById("block"), story = document.getElementById("story");
+  const close = nodes.length < repo.nodes.length;
+  let left, right, top, bottom;
+  if (compact()) {
+    // Phone layout: the graph gets the strip between the story and the controls.
+    left = right = 16;
+    top = story.getBoundingClientRect().bottom + 12;
+    bottom = H - block.getBoundingClientRect().top + 12;
+    // If the panels leave almost no strip, center the graph on the whole screen instead.
+    if (H - top - bottom < 80) top = bottom = 16;
+  } else {
+    // When the title block fills the right-hand side, frame the graph beside it.
+    right = block.offsetHeight > H * 0.45 ? block.offsetWidth + 48 : close ? block.offsetWidth + 60 : 50;
+    left = close ? Math.min(W * 0.25, 300) : Math.min(W * 0.2, 250);
+    top = close ? 60 : 36;
+    bottom = close ? story.offsetHeight + 70 : Math.min(H * 0.3, 250);
+  }
+  const pad = close ? (compact() ? 8 : 40) : 0;
+  // Keep the space positive even when the panels cover most of a small screen.
+  const room = (size, a, b) => Math.max(60, size - a - b - 2 * pad);
+  let k = Math.min(room(W, left, right) / Math.max(1, x1 - x0), room(H, top, bottom) / Math.max(1, y1 - y0));
+  k = Math.max(0.02, close ? Math.min(k, 2.4) : k);
+  const t = d3.zoomIdentity.translate(left + room(W, left, right) / 2 + pad, top + room(H, top, bottom) / 2 + pad)
+    .scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
+  d3.select(canvas).transition().duration(animate && !REDUCED ? 900 : 0).call(zoom.transform, t);
+}
+const fit = (animate = true) => frameNodes(repo.nodes, animate);
+// Matches the phone layout's media query.
+const compact = () => W <= 700 || H <= 520;
+
+// ---------- ui ----------
+function setScene(index, animate = true) {
+  scene = Math.max(0, Math.min(SCENES.length - 1, index));
+  sceneStart = performance.now();
+  const s = SCENES[scene];
+  document.getElementById("kicker").textContent = s.kicker(repo);
+  document.getElementById("title").textContent = s.title(repo);
+  document.getElementById("body").innerHTML = s.body(repo);
+  const figure = document.getElementById("figure");
+  figure.innerHTML = s.figure(repo);
+  void figure.offsetWidth; // commit the empty bars so the growth transitions
+  figure.querySelectorAll("[data-g]").forEach(el => { el.style.flexGrow = el.dataset.g; });
+  figure.querySelectorAll("[data-w]").forEach(el => { el.style.width = el.dataset.w; });
+  document.querySelectorAll("#key [data-k]").forEach(el => { el.hidden = !s.legend.includes(el.dataset.k); });
+  document.getElementById("sheetno").textContent = `${scene + 1} of ${SCENES.length}`;
+  document.querySelectorAll("#steps button").forEach((b, i) => {
+    b.classList.toggle("on", i === scene); b.setAttribute("aria-pressed", i === scene);
+  });
+  document.getElementById("prev").disabled = scene === 0;
+  document.getElementById("next").disabled = scene === SCENES.length - 1;
+  const want = s.key === "example" ? "example" : "all";
+  if (want !== framing) {
+    framing = want;
+    userMoved = false;
+    if (want === "example") frameNodes(exampleNodes(), animate); else fit(animate);
+  }
+}
+
+const picker = document.getElementById("repo");
+const GROUPS = { popular: "Popular repos, study 07", original: "Smaller repos, study 05" };
+for (const key of Object.keys(DATA.studies)) {
+  const group = document.createElement("optgroup");
+  group.label = GROUPS[key];
+  DATA.repositories.forEach((r, i) => {
+    if (r.study !== key) return;
+    group.appendChild(new Option(r.name, String(i)));
+  });
+  picker.appendChild(group);
+}
+picker.onchange = () => load(+picker.value);
+const STEP_NAMES = ["What this is", "Graphify's map", "Jev checks one function", "Jev's links", "Running the tests",
+  "Keyword search on its own", "The first suggestion", "Where it didn't help"];
+const stepsEl = document.getElementById("steps");
+SCENES.forEach((s, i) => {
+  const b = document.createElement("button");
+  b.textContent = i + 1; b.title = STEP_NAMES[i]; b.setAttribute("aria-label", STEP_NAMES[i]); b.onclick = () => setScene(i);
+  stepsEl.appendChild(b);
+});
+document.getElementById("prev").onclick = () => setScene(scene - 1);
+document.getElementById("next").onclick = () => setScene(scene + 1);
+
+window.addEventListener("keydown", e => {
+  if (e.metaKey || e.ctrlKey || e.altKey || e.target === picker) return;
+  const k = e.key.toLowerCase();
+  if (e.key === " " || e.key === "ArrowRight") { e.preventDefault(); setScene(scene + 1); }
+  else if (e.key === "ArrowLeft") setScene(scene - 1);
+  else if (/^[1-8]$/.test(e.key)) setScene(+e.key - 1);
+  else if (k === "r") setScene(scene);
+  else if (k === "f") { framing = null; setScene(scene); }
+  else if (k === "c") document.body.classList.toggle("clean");
+  else if (k === "d") setTheme(document.documentElement.dataset.theme === "dark" ? "paper" : "dark");
+  else if (e.key === "[") load((repo.index + DATA.repositories.length - 1) % DATA.repositories.length);
+  else if (e.key === "]") load((repo.index + 1) % DATA.repositories.length);
+  else if (e.key === "Escape") { selected = null; renderDetail(); }
+});
+
+// ---------- pan, zoom, pick ----------
+const zoom = d3.zoom().scaleExtent([0.02, 12])
+  .on("start", () => canvas.classList.add("dragging"))
+  .on("end", () => canvas.classList.remove("dragging"))
+  .on("zoom", e => { transform = e.transform; syncGrid(); if (e.sourceEvent) userMoved = true; });
+d3.select(canvas).call(zoom).on("dblclick.zoom", null);
+
+// The paper grid moves with the map, snapping between 5x steps like a drafting sheet.
+function syncGrid() {
+  let s = 20 * transform.k;
+  if (!(s > 0 && isFinite(s))) return;
+  while (s < 12) s *= 5;
+  while (s > 60) s /= 5;
+  const big = `${s * 5}px ${s * 5}px`, small = `${s}px ${s}px`, pos = `${transform.x}px ${transform.y}px`;
+  document.body.style.backgroundSize = [big, big, small, small].join(",");
+  document.body.style.backgroundPosition = [pos, pos, pos, pos].join(",");
+}
+
+function nodeAt(px, py) {
+  const [x, y] = transform.invert([px, py]);
+  let best = null, bestD = Infinity;
+  for (const n of repo.nodes) {
+    const d = Math.hypot(n.x - x, n.y - y);
+    if (d <= Math.max(n.r + 2, 9 / transform.k) && d < bestD) { best = n; bestD = d; }
+  }
+  return best;
+}
+
+const tip = document.getElementById("tip");
+canvas.addEventListener("mousemove", e => {
+  hover = nodeAt(e.clientX, e.clientY);
+  if (!hover) { tip.style.display = "none"; return; }
+  tip.style.display = "block";
+  tip.style.left = e.clientX + 14 + "px"; tip.style.top = e.clientY + 12 + "px";
+  const name = hover.target ? short(hover.target.symbol) : hover.label;
+  tip.innerHTML = `<code>${escape(name)}</code><br><span class="f">${escape(hover.file)}</span>`;
+});
+canvas.addEventListener("mouseleave", () => { hover = null; tip.style.display = "none"; });
+canvas.addEventListener("click", e => { selected = nodeAt(e.clientX, e.clientY); renderDetail(); });
+
+const verdict = v => v === null || v === undefined ? `<span class="none" title="This test failed, got skipped, or wasn't collected, so there's no answer for it">n/a</span>`
+  : v ? `<span class="yes">yes</span>` : `<span class="no">no</span>`;
+
+function renderDetail() {
+  const el = document.getElementById("detail");
+  if (!selected) { el.style.display = "none"; return; }
+  el.style.display = "block";
+  // Stop above the control block so the two never overlap.
+  el.style.maxHeight = `${Math.max(160, document.getElementById("block").getBoundingClientRect().top - 44)}px`;
+  const n = selected, t = n.target;
+  let html = `<button id="close" aria-label="Close" onclick="selected=null;renderDetail()">×</button>
+    <h3>${escape(t ? short(t.symbol) : n.label)}</h3><div class="file">${escape(n.file)}${n.unmapped ? ", not in Graphify's graph" : ""}</div>`;
+  if (t) {
+    const mine = repo.overlay.filter(l => l.f === n.i);
+    html += `<h4>Tests Jev was asked about</h4><table><tr><td class="note">test</td><td class="n note">Jev score</td><td class="v note">ran it?</td></tr>`;
+    for (const c of t.candidates) {
+      const link = mine.find(l => l.t === c.node);
+      html += `<tr><td><code class="${c.score >= THRESHOLD ? "hi" : ""}">${escape(short(c.test))}</code></td>
+        <td class="n">${c.score.toFixed(2)}</td><td class="v">${verdict(link ? link.observed : null)}</td></tr>`;
+    }
+    html += `</table><div class="note">Bold tests scored ${THRESHOLD} or higher, so Jev added them to the map.</div>`;
+    if (t.positive) {
+      html += `<h4>First suggested test</h4><table>
+        <tr><td>Without Jev: <code>${escape(short(t.before || "none"))}</code></td><td class="v">${verdict(t.beforeHit)}</td></tr>
+        <tr><td>With Jev: <code>${escape(short(t.after || "none"))}</code></td><td class="v">${verdict(t.afterHit)}</td></tr></table>`;
+    }
+    html += `<h4>Tests that ran it: ${t.observed.length}</h4>` + (t.observed.length
+      ? `<table>${t.observed.slice(0, 10).map(x => `<tr><td><code>${escape(short(x))}</code></td></tr>`).join("")}</table>` +
+        (t.observed.length > 10 ? `<div class="note">and ${t.observed.length - 10} more</div>` : "")
+      : `<div class="note">None of the tests I ran called it.</div>`);
+  } else {
+    const links = repo.overlay.filter(l => l.t === n.i && l.jev);
+    if (links.length) {
+      html += `<h4>Jev linked this test to</h4><table>` + links.map(l =>
+        `<tr><td><code>${escape(short(repo.nodes[l.f].target ? repo.nodes[l.f].target.symbol : repo.nodes[l.f].label))}</code></td>
+         <td class="n">${l.score.toFixed(2)}</td><td class="v">${verdict(l.observed)}</td></tr>`).join("") + `</table>`;
+    }
+    html += `<div class="note">${plural(n.degree, "connection", "connections")} in Graphify's graph.</div>`;
+  }
+  el.innerHTML = html;
+}
+
+// ---------- drawing ----------
+function curve(a, b) {
+  const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, dx = b.x - a.x, dy = b.y - a.y;
+  return [mx - dy * 0.16, my + dx * 0.16];
+}
+function pointOn(l, t) {
+  const [cx, cy] = curve(l.a, l.b), u = 1 - t;
+  return [u * u * l.a.x + 2 * u * t * cx + t * t * l.b.x, u * u * l.a.y + 2 * u * t * cy + t * t * l.b.y];
+}
+// Draws a link from its function toward its test; `progress` reveals it like a pen stroke.
+function stroke(l, color, width, progress, alpha, dash) {
+  if (progress <= 0 || alpha <= 0) return;
+  const [cx, cy] = curve(l.a, l.b);
+  const len = Math.hypot(l.b.x - l.a.x, l.b.y - l.a.y) * 1.1 + 1;
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width / transform.k;
+  if (progress < 1) {
+    ctx.setLineDash([len * progress, len]);
+  } else {
+    ctx.setLineDash(dash ? dash.map(d => d / transform.k) : []);
+  }
+  ctx.beginPath(); ctx.moveTo(l.a.x, l.a.y); ctx.quadraticCurveTo(cx, cy, l.b.x, l.b.y); ctx.stroke();
+  ctx.setLineDash([]);
+}
+function strike(l, alpha) {
+  const [x, y] = pointOn(l, 0.5), s = 3.2 / transform.k;
+  ctx.globalAlpha = alpha; ctx.strokeStyle = C.red; ctx.lineWidth = 1.8 / transform.k;
+  ctx.beginPath(); ctx.moveTo(x - s, y - s); ctx.lineTo(x + s, y + s); ctx.moveTo(x + s, y - s); ctx.lineTo(x - s, y + s); ctx.stroke();
+}
+function inked(l, p, alpha = 1) {
+  if (l.observed) stroke(l, C.blue, 2.4, p, alpha, null);
+  else { stroke(l, C.red, 2, p, alpha, [3, 3]); if (p >= 1) strike(l, alpha); }
+}
+
+// Nodes the current step is about stay at full strength; everything else steps back.
+function activeNodes(key) {
+  const ends = ls => new Set(ls.flatMap(l => [l.f, l.t]));
+  if (key === "example") return new Set(exampleNodes().map(n => n.i));
+  if (key === "jev" || key === "verify") return ends(repo.overlay.filter(l => l.jev));
+  if (key === "keyword") return ends(repo.overlay.filter(l => l.keyword));
+  if (key === "first") return new Set(repo.targets.filter(t => t.positive && t.afterNode !== null).flatMap(t => [t.node, t.afterNode]));
+  return null;
+}
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!repo) return;
+  const el = REDUCED ? 99 : (now - sceneStart) / 1000;
+  const key = SCENES[scene].key;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  ctx.setTransform(DPR * transform.k, 0, 0, DPR * transform.k, DPR * transform.x, DPR * transform.y);
+  ctx.lineCap = "round";
+
+  const quiet = key === "map" ? 1 : key === "intro" ? 0.6 : key === "example" ? 0.3 : 0.4;
+  const active = activeNodes(key);
+  const focus = selected ? new Set([selected.i, ...repo.overlay.filter(l => l.f === selected.i || l.t === selected.i).flatMap(l => [l.f, l.t])]) : null;
+
+  // Graphify's own edges, drawn as faint graphite.
+  ctx.globalAlpha = 0.32 * quiet;
+  ctx.strokeStyle = C.graphite;
+  ctx.lineWidth = 0.7 / transform.k;
+  ctx.beginPath();
+  for (const l of repo.links) { ctx.moveTo(l.source.x, l.source.y); ctx.lineTo(l.target.x, l.target.y); }
+  ctx.stroke();
+
+  const acc = repo.overlay.filter(l => l.jev);
+  if (key === "example") {
+    for (const l of repo.example.links) {
+      const p = ease((el - 0.9 - l.k * 0.35) / 0.6);
+      if (l.score >= THRESHOLD) stroke(l, C.pencil, 2.2, p, 1, [5, 3]);
+      else stroke(l, C.graphite, 1.4, p, 0.9, [1.5, 3]);
+    }
+  } else if (key === "jev") {
+    const n = repo.overlay.length;
+    for (const l of repo.overlay) {
+      if (l.jev) continue;
+      const fade = 1 - ease((el - 1.8 - (l.i / n) * 0.6) / 0.6);
+      stroke(l, C.graphite, 0.9, ease((el - 0.2 - (l.i / n) * 0.9) / 0.4), 0.55 * fade, [1.5, 3]);
+    }
+    for (const l of acc) stroke(l, C.pencil, 2, ease((el - 1.4 - l.order * 1.6) / 0.6), 0.95, [5, 3]);
+  } else if (key === "verify") {
+    for (const l of acc) {
+      stroke(l, C.pencil, 2, 1, 0.5, [5, 3]);
+      inked(l, ease((el - 0.4 - l.order * 2.2) / 0.5));
+    }
+  } else if (key === "keyword") {
+    for (const l of acc) inked(l, 1, 0.14);
+    for (const l of repo.overlay.filter(l => l.keyword)) inked(l, ease((el - 0.4 - l.korder * 1.6) / 0.5));
+  } else if (key === "first") {
+    for (const t of repo.targets) {
+      if (!t.positive || t.afterNode === null) continue;
+      const changed = t.beforeHit !== t.afterHit;
+      const l = { a: repo.nodes[t.node], b: repo.nodes[t.afterNode], observed: t.afterHit };
+      inked(l, ease((el - 0.3) / 0.8), changed ? 1 : 0.3);
+    }
+  }
+
+  // Nodes: shape says what it is, color is saved for verdicts.
+  for (const n of repo.nodes) {
+    const on = active && active.has(n.i);
+    let alpha = n.target ? 1 : n.kind === "test" ? 0.85 : n.kind === "module" ? 0.55 : 0.8;
+    if (!on && !n.target && key !== "map") alpha *= key === "intro" ? 0.7 : 0.45;
+    if (key === "example" && !on && n.target) alpha *= 0.35;
+    if (focus && !focus.has(n.i)) alpha *= 0.3;
+    ctx.globalAlpha = alpha;
+    if (n.target) {
+      ctx.fillStyle = C.paper; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5 / transform.k;
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 7); ctx.fill(); ctx.stroke();
+    } else if (n.kind === "test") {
+      const s = Math.max(n.r, on ? 3 : 2.2) * 0.9;
+      ctx.fillStyle = on ? C.ink : C.ink2; ctx.fillRect(n.x - s, n.y - s, 2 * s, 2 * s);
+    } else {
+      ctx.fillStyle = C.graphite;
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 7); ctx.fill();
+    }
+  }
+
+  if (key === "example") {
+    const ex = repo.example, fn = repo.nodes[ex.node];
+    label(fn, short(ex.symbol), C.ink, ease(el / 0.4));
+    for (const l of ex.links) {
+      const hit = l.score >= THRESHOLD;
+      label(l.b, `${short(l.test)}  ${l.score.toFixed(2)}`, hit ? C.ink : C.ink2, ease((el - 1.3 - l.k * 0.35) / 0.4));
+    }
+  } else if (key === "first") {
+    const p = ease((el - 0.9) / 0.5);
+    for (const t of repo.targets) {
+      if (!t.positive || t.beforeHit === t.afterHit) continue;
+      const n = repo.nodes[t.node], color = t.afterHit ? C.blue : C.red;
+      ctx.globalAlpha = p; ctx.strokeStyle = color; ctx.lineWidth = 2 / transform.k;
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 5 / transform.k, 0, 7); ctx.stroke();
+      label(n, short(t.symbol), color, p);
+    }
+  } else if (transform.k > 1.6 && key !== "limits") {
+    const a = Math.min(1, (transform.k - 1.6) * 1.5);
+    for (const t of repo.targets) label(repo.nodes[t.node], short(t.symbol), C.ink, a * 0.9);
+  }
+  if (selected) {
+    ctx.globalAlpha = 1; ctx.strokeStyle = C.ink; ctx.lineWidth = 2 / transform.k;
+    ctx.beginPath(); ctx.arc(selected.x, selected.y, selected.r + 4 / transform.k, 0, 7); ctx.stroke();
+    label(selected, selected.target ? short(selected.target.symbol) : selected.label, C.ink, 1);
+  }
+  if (hover && hover !== selected) {
+    ctx.globalAlpha = 0.8; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.2 / transform.k;
+    ctx.beginPath(); ctx.arc(hover.x, hover.y, hover.r + 3 / transform.k, 0, 7); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function label(n, text, color, alpha) {
+  if (alpha <= 0) return;
+  const size = 11.5 / transform.k, x = n.x + n.r + 5 / transform.k, y = n.y + size * 0.35;
+  ctx.font = `600 ${size}px "Overpass Mono", monospace`;
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = 4 / transform.k; ctx.strokeStyle = C.paper; ctx.lineJoin = "round";
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = color; ctx.fillText(text, x, y);
+}
+
+load(0);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

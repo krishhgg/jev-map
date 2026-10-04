@@ -9,3 +9,4 @@ dist/
 .jev-map/
 .ruff_cache/
 .pytest_cache/
+demo/jev-map-graph.html
