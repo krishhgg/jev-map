@@ -105,7 +105,7 @@ Add it to your agent's MCP config:
 }
 ```
 
-The agent gets four tools: `related_tests(symbol)`, `explain_link(function, test)`, `refresh_map()` and `enrich_symbol(symbol)`. The server stays bound to that one repository, and its tools can't open another path or ask for an API key. To let it call Jev, start it with `serve --jev --max-calls 20`. The call limit covers every refresh and enrichment in that session.
+The agent gets four tools: `related_tests(symbol)`, `explain_link(function, test)`, `refresh_map()` and `enrich_symbol(symbol)`. The server stays bound to that one repository, and its tools can't open another path or ask for an API key. To let it call Jev, add `--jev --max-calls 20 --env-file /path/to/private/.env` to the server's arguments. The server reads `TYPESAFE_API_KEY` from that file, or from its own environment if your agent passes it through. The call limit covers every refresh and enrichment in that session.
 
 ## Turn on Jev
 
