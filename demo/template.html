@@ -129,8 +129,9 @@
   #tip .f { color: var(--ink2); }
   body.clean #key, body.clean #block .foot { display: none; }
 
-  /* Phones: the story sits at the top, the controls at the bottom, and the graph between them. */
-  @media (max-width: 700px) {
+  /* Phones, and any short screen: the story sits at the top, the controls at the
+     bottom, and the graph between them. */
+  @media (max-width: 700px), (max-height: 520px) {
     body { font-size: 14px; }
     #sheet { inset: 6px; }
     #key { display: none; }
@@ -150,6 +151,12 @@
     #steps button { height: 34px; font-size: 14px; }
     .nav button { height: 40px; }
     #detail { left: 10px; right: 10px; top: 10px; width: auto; }
+  }
+  /* Phones held sideways: shrink the story and drop the step buttons, since Back and Next remain. */
+  @media (max-height: 520px) {
+    #story { max-height: 40vh; }
+    #block .name { font-size: 18px; padding-top: 8px; }
+    #block .steprow { display: none; }
   }
 </style>
 </head>
@@ -184,7 +191,7 @@
   <div class="sheetno">Step<b id="sheetno">1 of 8</b></div>
   <div class="wide sub">Which tests run this function?</div>
   <label class="wide row"><span class="lbl">Repository</span><select id="repo"></select></label>
-  <div class="wide"><div id="steps"></div></div>
+  <div class="wide steprow"><div id="steps"></div></div>
   <div class="wide nav"><button id="prev">Back</button><button id="next">Next</button></div>
   <div class="wide foot"><span id="source"></span>
     Use the arrow keys to move between steps. Click any circle for details, and press D for dark mode.</div>
@@ -347,9 +354,12 @@ function resize() {
   W = window.innerWidth; H = window.innerHeight;
   canvas.width = W * DPR; canvas.height = H * DPR;
 }
+// A phone's address bar showing or hiding fires resize, so only reframe if the
+// visitor hasn't moved the graph themselves.
+let userMoved = false;
 window.addEventListener("resize", () => {
   resize();
-  if (repo) framing === "example" ? frameNodes(exampleNodes(), false) : fit(false);
+  if (repo && !userMoved) framing === "example" ? frameNodes(exampleNodes(), false) : fit(false);
 });
 resize();
 
@@ -416,11 +426,13 @@ function frameNodes(nodes, animate) {
   const block = document.getElementById("block"), story = document.getElementById("story");
   const close = nodes.length < repo.nodes.length;
   let left, right, top, bottom;
-  if (W <= 700) {
+  if (compact()) {
     // Phone layout: the graph gets the strip between the story and the controls.
     left = right = 16;
     top = story.getBoundingClientRect().bottom + 12;
     bottom = H - block.getBoundingClientRect().top + 12;
+    // If the panels leave almost no strip, center the graph on the whole screen instead.
+    if (H - top - bottom < 80) top = bottom = 16;
   } else {
     // When the title block fills the right-hand side, frame the graph beside it.
     right = block.offsetHeight > H * 0.45 ? block.offsetWidth + 48 : close ? block.offsetWidth + 60 : 50;
@@ -428,7 +440,7 @@ function frameNodes(nodes, animate) {
     top = close ? 60 : 36;
     bottom = close ? story.offsetHeight + 70 : Math.min(H * 0.3, 250);
   }
-  const pad = close ? (W <= 700 ? 8 : 40) : 0;
+  const pad = close ? (compact() ? 8 : 40) : 0;
   // Keep the space positive even when the panels cover most of a small screen.
   const room = (size, a, b) => Math.max(60, size - a - b - 2 * pad);
   let k = Math.min(room(W, left, right) / Math.max(1, x1 - x0), room(H, top, bottom) / Math.max(1, y1 - y0));
@@ -438,6 +450,8 @@ function frameNodes(nodes, animate) {
   d3.select(canvas).transition().duration(animate && !REDUCED ? 900 : 0).call(zoom.transform, t);
 }
 const fit = (animate = true) => frameNodes(repo.nodes, animate);
+// Matches the phone layout's media query.
+const compact = () => W <= 700 || H <= 520;
 
 // ---------- ui ----------
 function setScene(index, animate = true) {
@@ -462,6 +476,7 @@ function setScene(index, animate = true) {
   const want = s.key === "example" ? "example" : "all";
   if (want !== framing) {
     framing = want;
+    userMoved = false;
     if (want === "example") frameNodes(exampleNodes(), animate); else fit(animate);
   }
 }
@@ -508,7 +523,7 @@ window.addEventListener("keydown", e => {
 const zoom = d3.zoom().scaleExtent([0.02, 12])
   .on("start", () => canvas.classList.add("dragging"))
   .on("end", () => canvas.classList.remove("dragging"))
-  .on("zoom", e => { transform = e.transform; syncGrid(); });
+  .on("zoom", e => { transform = e.transform; syncGrid(); if (e.sourceEvent) userMoved = true; });
 d3.select(canvas).call(zoom).on("dblclick.zoom", null);
 
 // The paper grid moves with the map, snapping between 5x steps like a drafting sheet.
