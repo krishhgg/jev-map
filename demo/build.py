@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 from collections import deque
 from pathlib import Path
 
@@ -177,6 +178,10 @@ def build(out: Path, benchmarks: Path, site_url: str | None = None) -> None:
         site_meta = (f'<meta property="og:url" content="{base}/">\n'
                      f'<meta property="og:image" content="{base}/preview.png">\n'
                      f'<meta name="twitter:image" content="{base}/preview.png">')
+        # The tags point at preview.png beside the page, so ship the image with it.
+        image = out.parent / "preview.png"
+        if image.resolve() != (HERE / "preview.png").resolve():
+            shutil.copyfile(HERE / "preview.png", image)
     page = template.replace("<!--__SITE_META__-->", site_meta)
     out.write_text(page.replace("/*__DATA__*/null", json.dumps(data, separators=(",", ":"))))
     print(f"wrote {out} ({out.stat().st_size // 1024} KiB): "

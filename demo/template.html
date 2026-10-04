@@ -128,6 +128,29 @@
     border: 1px solid var(--rule); display: none; max-width: 420px; }
   #tip .f { color: var(--ink2); }
   body.clean #key, body.clean #block .foot { display: none; }
+
+  /* Phones: the story sits at the top, the controls at the bottom, and the graph between them. */
+  @media (max-width: 700px) {
+    body { font-size: 14px; }
+    #sheet { inset: 6px; }
+    #key { display: none; }
+    #story { left: 10px; right: 10px; top: 10px; bottom: auto; width: auto; max-height: 46vh; overflow: auto; padding: 12px 14px; }
+    #story .kicker { font-size: 11px; }
+    #story h2 { font-size: 21px; margin-bottom: 6px; }
+    #story p { max-width: none; }
+    #figure { margin-top: 10px; padding-top: 10px; }
+    .num { font-size: 34px; } .num small { font-size: 15px; }
+    .cands { grid-template-columns: minmax(0, 1fr) 56px 30px 58px; gap: 6px 8px; font-size: 12.5px; }
+    #block { left: 10px; right: 10px; bottom: 10px; width: auto; }
+    #block > div, #block > label { padding: 8px 12px; }
+    #block .name { font-size: 22px; padding-top: 10px; }
+    #block .sheetno { padding-top: 10px; }
+    #block .sheetno b { display: inline; font-size: 18px; margin-left: 4px; }
+    #block .sub, #block .foot { display: none; }
+    #steps button { height: 34px; font-size: 14px; }
+    .nav button { height: 40px; }
+    #detail { left: 10px; right: 10px; top: 10px; width: auto; }
+  }
 </style>
 </head>
 <body>
@@ -324,7 +347,10 @@ function resize() {
   W = window.innerWidth; H = window.innerHeight;
   canvas.width = W * DPR; canvas.height = H * DPR;
 }
-window.addEventListener("resize", resize);
+window.addEventListener("resize", () => {
+  resize();
+  if (repo) framing === "example" ? frameNodes(exampleNodes(), false) : fit(false);
+});
 resize();
 
 // The worked example is the first sampled function, in study order, where Jev
@@ -389,14 +415,25 @@ function frameNodes(nodes, animate) {
   const [x0, x1] = d3.extent(nodes, n => n.x), [y0, y1] = d3.extent(nodes, n => n.y);
   const block = document.getElementById("block"), story = document.getElementById("story");
   const close = nodes.length < repo.nodes.length;
-  // When the title block fills the right-hand side, frame the graph beside it.
-  const right = block.offsetHeight > H * 0.45 ? block.offsetWidth + 48 : close ? block.offsetWidth + 60 : 50;
-  const left = close ? Math.min(W * 0.25, 300) : Math.min(W * 0.2, 250);
-  const top = close ? 60 : 36, bottom = close ? story.offsetHeight + 70 : Math.min(H * 0.3, 250);
-  const pad = close ? 40 : 0;
-  let k = Math.min((W - left - right - 2 * pad) / Math.max(1, x1 - x0), (H - top - bottom - 2 * pad) / Math.max(1, y1 - y0));
-  if (close) k = Math.min(k, 2.4);
-  const t = d3.zoomIdentity.translate(left + (W - left - right) / 2, top + (H - top - bottom) / 2)
+  let left, right, top, bottom;
+  if (W <= 700) {
+    // Phone layout: the graph gets the strip between the story and the controls.
+    left = right = 16;
+    top = story.getBoundingClientRect().bottom + 12;
+    bottom = H - block.getBoundingClientRect().top + 12;
+  } else {
+    // When the title block fills the right-hand side, frame the graph beside it.
+    right = block.offsetHeight > H * 0.45 ? block.offsetWidth + 48 : close ? block.offsetWidth + 60 : 50;
+    left = close ? Math.min(W * 0.25, 300) : Math.min(W * 0.2, 250);
+    top = close ? 60 : 36;
+    bottom = close ? story.offsetHeight + 70 : Math.min(H * 0.3, 250);
+  }
+  const pad = close ? (W <= 700 ? 8 : 40) : 0;
+  // Keep the space positive even when the panels cover most of a small screen.
+  const room = (size, a, b) => Math.max(60, size - a - b - 2 * pad);
+  let k = Math.min(room(W, left, right) / Math.max(1, x1 - x0), room(H, top, bottom) / Math.max(1, y1 - y0));
+  k = Math.max(0.02, close ? Math.min(k, 2.4) : k);
+  const t = d3.zoomIdentity.translate(left + room(W, left, right) / 2 + pad, top + room(H, top, bottom) / 2 + pad)
     .scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
   d3.select(canvas).transition().duration(animate && !REDUCED ? 900 : 0).call(zoom.transform, t);
 }
@@ -468,7 +505,7 @@ window.addEventListener("keydown", e => {
 });
 
 // ---------- pan, zoom, pick ----------
-const zoom = d3.zoom().scaleExtent([0.08, 12])
+const zoom = d3.zoom().scaleExtent([0.02, 12])
   .on("start", () => canvas.classList.add("dragging"))
   .on("end", () => canvas.classList.remove("dragging"))
   .on("zoom", e => { transform = e.transform; syncGrid(); });
@@ -477,6 +514,7 @@ d3.select(canvas).call(zoom).on("dblclick.zoom", null);
 // The paper grid moves with the map, snapping between 5x steps like a drafting sheet.
 function syncGrid() {
   let s = 20 * transform.k;
+  if (!(s > 0 && isFinite(s))) return;
   while (s < 12) s *= 5;
   while (s > 60) s /= 5;
   const big = `${s * 5}px ${s * 5}px`, small = `${s}px ${s}px`, pos = `${transform.x}px ${transform.y}px`;
