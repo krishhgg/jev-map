@@ -6,7 +6,7 @@ edge-filter comparison shows a large precision gap in Jev's favour, but its
 frozen gate requires every provider request to succeed, and 7 of 240 failed.
 
 The [protocol](PROTOCOL.md) and [freeze](rounds/round-00-freeze) were published
-in [PR #13](https://github.com/kgarg2468/jev-map/pull/13) before any provider
+in [PR #13](https://github.com/krishhgg/jev-map/pull/13) before any provider
 call or test-call label. All five suites passed preflight, and the per-file
 execution oracle completed with no failing file.
 

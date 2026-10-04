@@ -46,7 +46,7 @@ class JevClient:
                     self.api_key = value
         self.timeout = timeout
         if not self.api_key:
-            raise ProviderError("TYPESAFE_API_KEY is missing. Use tokenstash need TYPESAFE_API_KEY.")
+            raise ProviderError("TYPESAFE_API_KEY is missing. Set it in the environment or pass --env-file.")
 
     def __call__(self, payload: dict) -> dict:
         body = json.dumps(payload).encode()

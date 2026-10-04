@@ -214,7 +214,7 @@ def run(codex: Path, roots: dict[str, Path], out: Path, spool: Path,
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--codex", type=Path, default=Path("/home/kg/.local/opt/node/bin/codex"))
+    parser.add_argument("--codex", type=Path, default=Path("codex"), help="Codex CLI executable (default: codex on PATH)")
     parser.add_argument("--repo", action="append", required=True)
     parser.add_argument("--out", type=Path, default=HERE / "rounds/round-06-agent-runs")
     parser.add_argument("--spool", type=Path, default=Path("/tmp/jev-agent-runs-spool-v3"))

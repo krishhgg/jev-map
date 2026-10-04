@@ -131,7 +131,7 @@ def run(codex: Path, out: Path, *, timeout: int = 120) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--codex", type=Path, default=Path("/home/kg/.local/opt/node/bin/codex"))
+    parser.add_argument("--codex", type=Path, default=Path("codex"), help="Codex CLI executable (default: codex on PATH)")
     parser.add_argument("--out", type=Path, default=HERE / "rounds/round-03-cheap-hints")
     parser.add_argument("--timeout", type=int, default=120)
     args = parser.parse_args()

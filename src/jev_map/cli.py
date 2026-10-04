@@ -37,7 +37,7 @@ def main(argv=None) -> int:
     explain = commands.add_parser("explain-link")
     explain.add_argument("function")
     explain.add_argument("test")
-    serve = commands.add_parser("serve", help="Expose three tools over MCP stdio (optional dependency)")
+    serve = commands.add_parser("serve", help="Expose four tools over MCP stdio (optional dependency)")
     serve.add_argument("--jev", action="store_true", help="Allow TypeSafe source uploads during refresh")
     serve.add_argument("--max-calls", type=int, default=20, help="Maximum new Jev requests for the whole server session")
     serve.add_argument("--env-file", type=Path)
