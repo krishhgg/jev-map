@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>jev-map: which tests run this function?</title>
-<meta name="description" content="An interactive replay of jev-map: Jev, a system 1 model, judges which tests run each function in Flask, FastAPI, langchain-core, yt-dlp, Graphify and more, checked against real test runs.">
+<title>Which tests run this function? | jev-map</title>
+<meta name="description" content="What I found testing Jev, a system 1 model. I asked it which tests run 240 functions in Flask, FastAPI, LangChain, yt-dlp and Graphify, then ran the tests to check every answer.">
 <meta property="og:type" content="website">
-<meta property="og:title" content="jev-map: which tests run this function?">
-<meta property="og:description" content="Jev judged which tests run 240 functions in five popular repos. We checked every answer by running the tests.">
+<meta property="og:title" content="Which tests run this function? | jev-map">
+<meta property="og:description" content="I asked Jev which tests run 240 functions in five popular repos, then ran the tests to check every answer.">
 <meta name="twitter:card" content="summary_large_image">
 <!--__SITE_META__-->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -55,6 +55,7 @@
   #story h2 { margin: 0 0 8px; font-weight: 800; font-size: 29px; line-height: 1.1; letter-spacing: -0.015em; }
   #story p { margin: 0; color: var(--ink2); max-width: 48ch; }
   #story p code { color: var(--ink); word-break: break-word; }
+  #story p strong { color: var(--ink); font-weight: 700; }
   #figure:empty { display: none; }
   #figure { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule); }
   .num { font-weight: 800; font-size: 50px; line-height: 1; letter-spacing: -0.02em; }
@@ -136,12 +137,12 @@
 <!-- Each step shows only the key entries for what's on screen. -->
 <div id="key" class="box" aria-label="Key">
   <h4>Key</h4>
-  <div data-k="fn"><svg viewBox="0 0 28 12"><circle cx="14" cy="6" r="4.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/></svg>Function we picked</div>
+  <div data-k="fn"><svg viewBox="0 0 28 12"><circle cx="14" cy="6" r="4.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/></svg>Function I picked</div>
   <div data-k="code"><svg viewBox="0 0 28 12"><circle cx="14" cy="6" r="3" fill="var(--graphite)"/></svg>Other code</div>
   <div data-k="test"><svg viewBox="0 0 28 12"><rect x="11" y="3" width="6" height="6" fill="var(--ink2)"/></svg>Test</div>
   <div data-k="edge"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--graphite)" stroke-width="1"/></svg>Call or import Graphify found</div>
-  <div data-k="added"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--pencil)" stroke-width="2" stroke-dasharray="5 3"/></svg>Jev scored 0.8 or higher, link added</div>
-  <div data-k="rejected"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--graphite)" stroke-width="1.4" stroke-dasharray="1.5 3"/></svg>Below 0.8, not added</div>
+  <div data-k="added"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--pencil)" stroke-width="2" stroke-dasharray="5 3"/></svg>Jev said yes, 0.8 or higher</div>
+  <div data-k="rejected"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--graphite)" stroke-width="1.4" stroke-dasharray="1.5 3"/></svg>Jev said no, under 0.8</div>
   <div data-k="ran"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--blue)" stroke-width="2.2"/></svg>The test ran the function</div>
   <div data-k="didnt"><svg viewBox="0 0 28 12"><line x1="1" y1="6" x2="27" y2="6" stroke="var(--red)" stroke-width="1.8" stroke-dasharray="3 3"/><path d="M11 2 l6 8 M17 2 l-6 8" stroke="var(--red)" stroke-width="1.8"/></svg>The test didn't run it</div>
   <div data-k="better"><svg viewBox="0 0 28 12"><circle cx="14" cy="6" r="5.5" fill="none" stroke="var(--blue)" stroke-width="2"/></svg>First suggestion got better</div>
@@ -163,7 +164,7 @@
   <div class="wide"><div id="steps"></div></div>
   <div class="wide nav"><button id="prev">Back</button><button id="next">Next</button></div>
   <div class="wide foot"><span id="source"></span>
-    Arrow keys step through. Click any circle for details. D switches to dark.</div>
+    Use the arrow keys to move between steps. Click any circle for details, and press D for dark mode.</div>
 </div>
 
 <aside id="detail" class="box"></aside>
@@ -186,32 +187,36 @@ const code = s => `<code>${escape(s)}</code>`;
 const THRESHOLD = 0.8;
 
 // ---------- the eight steps ----------
-// Each step says what is on screen in plain words. `legend` lists the key rows it needs.
+// Each step says what is on screen in plain words, in first person. A technical
+// term is bolded and defined the first time it shows up. `legend` lists the key rows it needs.
 const place = r => `${r.name}, study ${DATA.studies[r.study].number}`;
+const term = s => `<strong>${s}</strong>`;
 const SCENES = [
-  { key: "intro", legend: ["fn", "code", "test", "edge"], kicker: () => "A walkthrough of jev-map",
+  { key: "intro", legend: ["fn", "code", "test", "edge"], kicker: () => "What I found testing Jev",
     title: () => "Which tests run this function?",
-    body: () => "Before you change a function, you want to run the tests that exercise it. Code graphs often miss " +
-      "those links, because tests tend to reach code indirectly, through fixtures, test clients and frameworks. " +
-      "jev-map asks Jev, TypeSafe's system 1 model, one quick question per candidate test. Does this test run this " +
-      "function? Then we checked every answer by running the tests.",
-    figure: () => `<div class="cap">Eight short steps. Press Next or the right arrow key.</div>` },
+    body: () => "When you change a function, you want to run the tests that use it. Finding those tests is harder than it sounds. " +
+      `Tests usually reach code indirectly, through ${term("fixtures")}, which is setup code that runs before a test. ` +
+      "So tools that only read the code miss a lot of these links. I asked Jev, TypeSafe's system 1 model, a quick yes " +
+      "or no question about each test. Does this test run this function? Then I ran the tests to check every answer.",
+    figure: () => `<div class="cap">It's 8 short steps. Hit Next or the right arrow key to go through them.</div>` },
   { key: "map", legend: ["fn", "code", "test", "edge"], kicker: place,
-    title: () => "Graphify maps the code",
-    body: r => `Graphify, an open-source code mapper, read ${r.name}'s source and drew this graph in ` +
-      `${r.graphify.wall_seconds.toFixed(1)} seconds without calling a model. Dots are functions, classes and files, ` +
-      `squares are tests, and lines are the calls and imports it found. The ${r.targets.length} open circles are ` +
-      `functions we picked with a fixed random seed before seeing any results.` +
-      (r.shownNodes < r.totalNodes ? ` This view shows the ${fmt(r.shownNodes)} nodes nearest them, out of ${fmt(r.totalNodes)}.` : ""),
+    title: () => "First, Graphify maps the code",
+    body: r => `${term("Graphify")} is an open-source tool that turns a codebase into a graph. It read ${r.name}'s code and ` +
+      `drew this in ${r.graphify.wall_seconds.toFixed(1)} seconds, with no AI model involved. Dots are functions, classes ` +
+      `and files. Squares are tests. Lines are the calls and imports Graphify found. The ${r.targets.length} open circles ` +
+      `are the functions I tested. I picked them at random before seeing any results, using a fixed ${term("seed")}, the ` +
+      `number that controls the random picks, so anyone can get the same ones.` +
+      (r.shownNodes < r.totalNodes ? ` This view only shows the ${fmt(r.shownNodes)} nodes closest to them, out of ${fmt(r.totalNodes)}.` : ""),
     figure: () => "" },
   { key: "example", legend: ["fn", "test", "added", "rejected"], kicker: place,
     title: () => "Jev checks one function",
     body: r => {
-      const ex = r.example;
-      return `Take ${code(short(ex.symbol))}. Keyword search found ${say(ex.candidates.length)} tests that might run it. ` +
-        `Jev reads the function and each test, and gives each pair a score. All ${say(ex.candidates.length)} answers come back ` +
-        `in one request, about ${(study().jevSeconds / study().jevRequests).toFixed(2)} seconds on average. ` +
-        `A score of ${THRESHOLD} or higher puts the link on the map.`;
+      const ex = r.example, n = ex.candidates.length;
+      return `Take ${code(short(ex.symbol))}. First, ${term("keyword search")} picks ${say(n)} tests that might run it. ` +
+        "It ranks tests by the words they share with the function, and rare words count more. Then Jev reads the function " +
+        `and each test and scores each pair from 0 to 1. All ${say(n)} scores come back in one request, in about ` +
+        `${(study().jevSeconds / study().jevRequests).toFixed(2)} seconds on average. Anything at ${THRESHOLD} or higher ` +
+        "counts as a yes and goes on the map.";
     },
     figure: r => {
       const rows = r.example.candidates.map(c => `<div class="cand${c.score >= THRESHOLD ? " on" : ""}" style="display:contents">
@@ -220,42 +225,43 @@ const SCENES = [
           <span class="val">${c.score.toFixed(2)}</span>
           <span class="out">${c.score >= THRESHOLD ? "added" : "not added"}</span></div>`).join("");
       return `<div class="cands">${rows}</div>
-        <div class="cap">The tick on each bar marks the ${THRESHOLD} cutoff. Jev hasn't seen any test results.</div>`;
+        <div class="cap">The tick on each bar is the ${THRESHOLD} cutoff. Jev hasn't seen any test results at this point.</div>`;
     } },
   { key: "jev", legend: ["fn", "test", "added"], kicker: place,
-    title: () => "Jev adds links across the repo",
+    title: () => "Jev's links across the whole repo",
     body: r => {
       const acc = r.overlay.filter(l => l.jev), known = acc.filter(l => l.graphify).length;
-      const note = known === 0 ? "Graphify's graph had none of them."
-        : `Graphify's graph had only ${say(known)} of them.`;
-      return `Jev ran the same check on all ${r.targets.length} circled functions. Out of ${r.overlay.length} candidate ` +
-        `links, it added ${acc.length}. ${note}`;
+      const note = known === 0 ? "Graphify's graph didn't have any of them."
+        : `Graphify's graph only had ${say(known)} of them.`;
+      return `Jev did the same check for all ${r.targets.length} circled functions. Out of ${r.overlay.length} possible ` +
+        `links, it said yes to ${acc.length}. ${note}`;
     },
-    figure: r => `<div class="num">${r.overlay.filter(l => l.jev).length} <small>links added in ${r.name}</small></div>` },
+    figure: r => `<div class="num">${r.overlay.filter(l => l.jev).length} <small>new links in ${r.name}</small></div>` },
   { key: "verify", legend: ["fn", "test", "ran", "didnt"], kicker: place,
-    title: () => "Then we ran the tests",
+    title: () => "Then I ran the tests",
     body: r => {
       const missed = r.overlay.filter(l => l.observed && !l.jev).length;
-      return "Afterwards we ran every test under a tracer that records which functions it calls. Blue means the test " +
-        "called the function. Red means it didn't." +
-        (missed ? ` Jev also left out ${missed} other candidate ${missed === 1 ? "link" : "links"} that the tests did run, ` +
-          "so a link missing from the map doesn't mean a test is unrelated." : "");
+      return `To check Jev's answers, I ran every test with a ${term("tracer")}, a tool that records every function a test ` +
+        "calls. Blue means the test did call the function. Red means it didn't." +
+        (missed ? ` Jev also skipped ${missed} ${missed === 1 ? "link" : "links"} that the tests did run. So if a link isn't ` +
+          "on the map, that doesn't mean the test is unrelated." : "");
     },
     figure: r => {
       const acc = r.overlay.filter(l => l.jev), ok = acc.filter(l => l.observed).length, e = study().edge.jev;
-      return `<div class="num">${ok} <small>of ${acc.length} were real</small></div>
-        <div class="cap">Jev's links in ${r.name} that a test really ran. Across all ${study().repoCount} repos in this study, ` +
-        `${e.observed} of ${e.emitted_eligible}, or ${pct(e.observed, e.emitted_eligible)}%.</div>`;
+      return `<div class="num">${ok} <small>of ${acc.length} were right</small></div>
+        <div class="cap">That's ${r.name}. Across all ${study().repoCount} repos in this study, Jev got ` +
+        `${e.observed} of ${e.emitted_eligible} right, which is ${pct(e.observed, e.emitted_eligible)}%.</div>`;
     } },
   { key: "keyword", legend: ["fn", "test", "ran", "didnt"], kicker: place,
-    title: () => "Could keyword search do this alone?",
+    title: () => "Could keyword search do this by itself?",
     body: r => {
       const n = r.overlay.filter(l => l.keyword).length;
-      const here = n === 0 ? `None of them are in ${r.name}.`
-        : `${cap(say(n))} of them ${n === 1 ? "is" : "are"} in ${r.name}, drawn here, with Jev's links faded behind.`;
-      return `Keyword search picked the candidates, so maybe Jev just repeats it. To check, we took the ` +
-        `${study().edge.jev.emitted_eligible} links keyword search scored highest across the ${study().repoCount} repos, ` +
-        `the same number Jev added. ${here}`;
+      const here = n === 0 ? `None of those picks are in ${r.name}.`
+        : n === 1 ? `One of them is in ${r.name}. It's drawn here, and Jev's links are faded out.`
+        : `${cap(say(n))} of them are in ${r.name}. They're drawn here, and Jev's links are faded out.`;
+      return "Keyword search picked the candidates in the first place, so maybe Jev is just repeating it. To test that, " +
+        `I took keyword search's top ${study().edge.jev.emitted_eligible} links across the ${study().repoCount} repos, ` +
+        `the same number Jev said yes to, and checked them the same way. ${here}`;
     },
     figure: () => {
       const j = study().edge.jev, k = study().edge.lexical_equal_count;
@@ -263,36 +269,36 @@ const SCENES = [
         <span class="stack"><span class="yes" data-g="${e.observed}"></span><span class="no" data-g="${e.emitted_eligible - e.observed}"></span></span>
         <span class="val">${e.observed} of ${e.emitted_eligible}, ${pct(e.observed, e.emitted_eligible)}%</span>`;
       return `<div class="bars">${bar("Jev", j)}${bar("Keywords", k)}</div>
-        <div class="cap">Links a test really ran, out of the ${j.emitted_eligible} each method picked.` +
-        (study().edgeGate ? "" : ` By the rules we set before this study, this comparison doesn't count as a pass, because ` +
-          `${study().jevErrors} of Jev's ${study().jevRequests} requests failed and the rules allowed no failures.`) +
+        <div class="cap">Each bar shows how many of the ${j.emitted_eligible} picks the tracer confirmed.` +
+        (study().edgeGate ? "" : " I set the rules for this study before running it. By those rules this doesn't count " +
+          `as a pass, because ${study().jevErrors} of Jev's ${study().jevRequests} requests failed and the rules allowed zero failures.`) +
         `</div>`;
     } },
   { key: "first", legend: ["fn", "ran", "didnt", "better", "worse"], kicker: place,
-    title: () => "Does the first suggestion run it?",
+    title: () => "Did the first suggestion get better?",
     body: r => {
       const intro = "For each function, jev-map ranks the tests and suggests one to open first. Each line goes from a function to that first test. ";
       const pos = r.targets.filter(t => t.positive);
       const gain = pos.filter(t => !t.beforeHit && t.afterHit).length, loss = pos.filter(t => t.beforeHit && !t.afterHit).length;
-      if (!gain && !loss) return intro + `Adding Jev's links didn't change whether it was right for any function in ${r.name}. ` +
-        "Any change came from other repos in this study.";
+      if (!gain && !loss) return intro + `Adding Jev's links didn't fix or break the first suggestion for any function in ${r.name}. ` +
+        "Any changes came from the other repos in this study.";
       const fns = n => `${say(n)} ${n === 1 ? "function" : "functions"}`;
-      const better = gain ? `fixed the first suggestion for ${fns(gain)} in ${r.name}, ringed in blue` : "";
-      const worse = loss ? `made ${gain ? "it" : "the first suggestion"} worse for ${fns(loss)}${gain ? "" : ` in ${r.name}`}, ringed in red` : "";
+      const better = gain ? `fixed the first suggestion for ${fns(gain)} in ${r.name}, circled in blue` : "";
+      const worse = loss ? `made ${gain ? "it" : "the first suggestion"} worse for ${fns(loss)}${gain ? "" : ` in ${r.name}`}, circled in red` : "";
       return intro + `Adding Jev's links ${[better, worse].filter(Boolean).join(", and ")}.`;
     },
     figure: () => `<div class="num">${study().hitAfter} <small>of ${study().positive} with Jev</small></div>
-      <div class="cap">Functions whose first suggested test really runs them, across the ${study().repoCount} repos. ` +
-      `Without Jev, ${study().hitBefore}. We left out functions that no test runs.` +
-      (study().primaryGate ? "" : " The gain is smaller than the one we said in advance would count as a win.") + `</div>` },
+      <div class="cap">That's how many functions got a first suggestion that runs them, across the ${study().repoCount} repos. ` +
+      `Without Jev it was ${study().hitBefore}. I left out functions that no test runs.` +
+      (study().primaryGate ? "" : " It's a smaller gain than I said up front I'd need to call it a win.") + `</div>` },
   { key: "limits", legend: ["fn", "code", "test"], kicker: () => "A separate study",
     title: () => "Where it didn't help",
-    body: () => "Next we gave Jev's hints to a coding agent that already had Graphify, ripgrep and pytest, and asked it to " +
-      "find a test that runs each of 24 functions in three other repos. It got 23 right with Jev's hints and 23 without. " +
-      "A small LLM's hints got 24, and they cost about ten times as much to make. Jev improved the map, " +
-      "but the agent found the answers without it.",
+    body: () => `I gave Jev's hints to a coding agent that already had Graphify, ${term("ripgrep")} for searching code, and ` +
+      `${term("pytest")} for running tests. Its job was to find a test that runs each of 24 functions in three other repos. ` +
+      `It got 23 right with Jev's hints and 23 without. Hints from a small ${term("LLM")}, short for large language model, ` +
+      "got 24 but cost about ten times as much to make. So Jev made the map better, but the agent didn't need it.",
     figure: () => `<div class="num">23 <small>of 24, with or without Jev</small></div>
-      <div class="cap">Study 06: cachetools, Tenacity and attrs, one agent run per task.</div>` },
+      <div class="cap">This is from study 06, which used cachetools, Tenacity and attrs, with one agent run per task.</div>` },
 ];
 
 // ---------- state ----------
@@ -370,8 +376,8 @@ function load(index) {
   selected = null; renderDetail();
   document.getElementById("repo").value = String(index);
   const st = DATA.studies[source.study];
-  document.getElementById("source").textContent = `Recorded results from study ${st.number}, which covers ${st.targets} ` +
-    `functions in ${st.repoCount} repos. Nothing re-runs in your browser.`;
+  document.getElementById("source").textContent = `These are recorded results from study ${st.number}, which covers ` +
+    `${st.targets} functions in ${st.repoCount} repos. Nothing re-runs in your browser.`;
   framing = null;
   setScene(scene, false);
 }
@@ -424,7 +430,7 @@ function setScene(index, animate = true) {
 }
 
 const picker = document.getElementById("repo");
-const GROUPS = { popular: "Popular repos (study 07)", original: "Smaller repos (study 05)" };
+const GROUPS = { popular: "Popular repos, study 07", original: "Smaller repos, study 05" };
 for (const key of Object.keys(DATA.studies)) {
   const group = document.createElement("optgroup");
   group.label = GROUPS[key];
@@ -435,8 +441,8 @@ for (const key of Object.keys(DATA.studies)) {
   picker.appendChild(group);
 }
 picker.onchange = () => load(+picker.value);
-const STEP_NAMES = ["What this is", "Graphify's map", "Jev checks one function", "Jev's links", "Run the tests",
-  "Keyword search, same number", "The first suggestion", "Where it didn't help"];
+const STEP_NAMES = ["What this is", "Graphify's map", "Jev checks one function", "Jev's links", "Running the tests",
+  "Keyword search on its own", "The first suggestion", "Where it didn't help"];
 const stepsEl = document.getElementById("steps");
 SCENES.forEach((s, i) => {
   const b = document.createElement("button");
@@ -500,7 +506,7 @@ canvas.addEventListener("mousemove", e => {
 canvas.addEventListener("mouseleave", () => { hover = null; tip.style.display = "none"; });
 canvas.addEventListener("click", e => { selected = nodeAt(e.clientX, e.clientY); renderDetail(); });
 
-const verdict = v => v === null || v === undefined ? `<span class="none" title="This test failed, was skipped, or wasn't collected, so we can't tell">n/a</span>`
+const verdict = v => v === null || v === undefined ? `<span class="none" title="This test failed, got skipped, or wasn't collected, so there's no answer for it">n/a</span>`
   : v ? `<span class="yes">yes</span>` : `<span class="no">no</span>`;
 
 function renderDetail() {
@@ -526,10 +532,10 @@ function renderDetail() {
         <tr><td>Without Jev: <code>${escape(short(t.before || "none"))}</code></td><td class="v">${verdict(t.beforeHit)}</td></tr>
         <tr><td>With Jev: <code>${escape(short(t.after || "none"))}</code></td><td class="v">${verdict(t.afterHit)}</td></tr></table>`;
     }
-    html += `<h4>Tests that really ran it: ${t.observed.length}</h4>` + (t.observed.length
+    html += `<h4>Tests that ran it: ${t.observed.length}</h4>` + (t.observed.length
       ? `<table>${t.observed.slice(0, 10).map(x => `<tr><td><code>${escape(short(x))}</code></td></tr>`).join("")}</table>` +
         (t.observed.length > 10 ? `<div class="note">and ${t.observed.length - 10} more</div>` : "")
-      : `<div class="note">None of the tests we ran called it.</div>`);
+      : `<div class="note">None of the tests I ran called it.</div>`);
   } else {
     const links = repo.overlay.filter(l => l.t === n.i && l.jev);
     if (links.length) {
