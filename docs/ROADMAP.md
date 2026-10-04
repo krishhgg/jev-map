@@ -1,4 +1,4 @@
-# First usable slice
+# Roadmap
 
 Implemented: Python structural relationships; optional bounded Jev inference;
 exact-request receipts; conservative source freshness checks; four MCP tools;
